@@ -1204,6 +1204,11 @@
       // and away/holiday ranges. Tune these to the real rota.
       var TODAY0 = (function () { var t = new Date(); t.setHours(0, 0, 0, 0); return t; })();
       function offset(days) { var d = new Date(TODAY0); d.setDate(d.getDate() + days); return d; }
+      // Canonical booking settings — mirror the `settings` seed (migration 004,
+      // FR-008). The production slot engine reads these at runtime; this static
+      // front-end mirrors the seeded defaults. FR-013/014, D6, FR-012.
+      var CFG = { leadMin: 120, horizonDays: 56, slotGridMin: 15, bufferMin: 0 };
+      var HORIZON_LAST = offset(CFG.horizonDays);
       var BARBERS = [
         { id: 'Avraz', img: 'assets/team-avraz.jpg', does: ['Knippen', 'Baard', 'Knippen + Baard', 'Kind (–12 j.)'], works: [2, 3, 4, 5, 6], away: [] },
         { id: 'Adil',  img: 'assets/team-adil.jpg',  does: ['Knippen', 'Knippen + Baard', 'Kind (–12 j.)'], works: [0, 2, 4, 5, 6], away: [] },
@@ -1213,14 +1218,30 @@
       function eligibleBarbersForSvc() { return BARBERS.filter(function (b) { return b.does.indexOf(state.svc) >= 0; }); }
       function isAway(b, d) { if (!b.away || !b.away.length) return false; var t = d.getTime(); return b.away.some(function (r) { return t >= r.from.getTime() && t <= r.to.getTime(); }); }
       function worksOn(b, d) { return b.works.indexOf(d.getDay()) >= 0 && !isAway(b, d); }
+      // Latest valid start (15-min grid, last start = window end − occupancy).
+      function lastStartMin() {
+        var occ = (SVC_DUR[state.svc] || 30) + (CFG.bufferMin || 0), last = -1;
+        for (var m = 600; m + occ <= 1200; m += CFG.slotGridMin) last = m;
+        return last;
+      }
+      // FR-013: today can be fully exhausted by the lead-time cutoff — if even
+      // its latest start is sooner than now+lead, today offers nothing.
+      function dayHasLeadSlot(d) {
+        if (d.toDateString() !== TODAY0.toDateString()) return true;
+        var ls = lastStartMin(); if (ls < 0) return false;
+        var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(ls / 60), ls % 60, 0, 0).getTime();
+        return dt >= Date.now() + CFG.leadMin * 60000;
+      }
       function dayAvailable(d) {
         if (d.getDay() === 1) return false;                 // Monday — shop closed
         if (d.getTime() < TODAY0.getTime()) return false;   // past
-        if (state.barber === 'any') return eligibleBarbersForSvc().some(function (b) { return worksOn(b, d); });
-        var b = BARBERS.filter(function (x) { return x.id === state.barber; })[0];
-        return b ? worksOn(b, d) : false;
+        if (d.getTime() > HORIZON_LAST.getTime()) return false; // FR-014 booking horizon (56d)
+        var works;
+        if (state.barber === 'any') works = eligibleBarbersForSvc().some(function (b) { return worksOn(b, d); });
+        else { var b = BARBERS.filter(function (x) { return x.id === state.barber; })[0]; works = b ? worksOn(b, d) : false; }
+        return works && dayHasLeadSlot(d);  // FR-013 lead-time exhaustion
       }
-      function firstAvailable() { var d = new Date(TODAY0); for (var i = 0; i < 120; i++) { if (dayAvailable(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate()); d.setDate(d.getDate() + 1); } return null; }
+      function firstAvailable() { var d = new Date(TODAY0); for (var i = 0; i <= CFG.horizonDays; i++) { if (dayAvailable(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate()); d.setDate(d.getDate() + 1); } return null; }
       function nearAway(b) { if (!b.away || !b.away.length) return null; var soon = offset(2); for (var i = 0; i < b.away.length; i++) { var r = b.away[i]; if (r.to.getTime() >= TODAY0.getTime() && r.from.getTime() <= soon.getTime()) return r; } return null; }
 
       var steps = {};
@@ -1370,8 +1391,9 @@
         var next = document.createElement('button'); next.type = 'button'; next.innerHTML = '\u203a'; next.setAttribute('aria-label', 'Volgende maand');
         var now = new Date();
         if (viewY === now.getFullYear() && viewM === now.getMonth()) prev.disabled = true;
+        if (new Date(viewY, viewM + 1, 1).getTime() > HORIZON_LAST.getTime()) next.disabled = true; // FR-014 cap forward nav at horizon
         prev.addEventListener('click', function () { viewM--; if (viewM < 0) { viewM = 11; viewY--; } renderCal(); });
-        next.addEventListener('click', function () { viewM++; if (viewM > 11) { viewM = 0; viewY++; } renderCal(); });
+        next.addEventListener('click', function () { if (next.disabled) return; viewM++; if (viewM > 11) { viewM = 0; viewY++; } renderCal(); });
         nav.appendChild(prev); nav.appendChild(next);
         bar.appendChild(title); bar.appendChild(nav); calWrap.appendChild(bar);
 
@@ -1438,8 +1460,17 @@
         if (!state.dateObj) { timesWrap.innerHTML = ''; return; }
         var dur = SVC_DUR[state.svc] || 30;
         var rb = resolveBarberFor(state.dateObj);
+        // 15-min start grid (FR-011/12, D6): starts :00/:15/:30/:45; last start =
+        // window end − occupancy. Buffer (FR-012) extends occupancy, not the
+        // visible end. Lead time (FR-013) hides slots sooner than now+leadMin.
+        var occupancy = dur + (CFG.bufferMin || 0);
+        var leadCut = Date.now() + CFG.leadMin * 60000;
+        var y = state.dateObj.getFullYear(), mo = state.dateObj.getMonth(), da = state.dateObj.getDate();
         var slots = [];
-        for (var m = 600; m + dur <= 1200; m += dur) slots.push(m); // 10:00 → 20:00
+        for (var m = 600; m + occupancy <= 1200; m += CFG.slotGridMin) {
+          var sdt = new Date(y, mo, da, Math.floor(m / 60), m % 60, 0, 0).getTime();
+          if (sdt >= leadCut) slots.push(m);
+        }
         renderTimes(slots, {});
         if (window.KB) {
           var reqDate = state.dateObj;
