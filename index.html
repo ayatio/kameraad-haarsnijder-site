@@ -1008,6 +1008,8 @@
 
   <script src="image-slot.js"></script>
   <script src="i18n.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="booking.js"></script>
   <script>
     // Entrance motion via IntersectionObserver, with guaranteed reveal.
     (function () {
@@ -1407,20 +1409,8 @@
 
       // ----- STEP 4: real slots for the chosen barber + day -----
       var timesWrap = document.getElementById('bkTimes');
-      function buildTimes() {
+      function renderTimes(slots, takenSet) {
         timesWrap.innerHTML = '';
-        if (!state.dateObj) return;
-        var dur = SVC_DUR[state.svc] || 30;
-        var rb = resolveBarberFor(state.dateObj);
-        var slots = [];
-        for (var m = 600; m + dur <= 1200; m += dur) slots.push(m); // 10:00 → 20:00
-        var taken = {}, free = 0;
-        slots.forEach(function (m) {
-          var v = hashStr(rb + '|' + state.dateObj.toDateString() + '|' + m) % 1000;
-          var thr = state.barber === 'any' ? 170 : 360;
-          taken[m] = v < thr; if (!taken[m]) free++;
-        });
-        if (free === 0 && slots.length) taken[slots[Math.floor(slots.length / 2)]] = false;
         var groups = [['morning', []], ['afternoon', []], ['evening', []]];
         slots.forEach(function (m) { groups[m < 780 ? 0 : (m < 1020 ? 1 : 2)][1].push(m); });
         var any = false;
@@ -1433,13 +1423,33 @@
           g[1].forEach(function (m) {
             var t = pad(Math.floor(m / 60)) + ':' + pad(m % 60);
             var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'bk-time'; btn.textContent = t; btn.dataset.time = t;
-            if (taken[m]) { btn.disabled = true; btn.title = KH.t('book.taken'); } else any = true;
+            if (takenSet[t]) { btn.disabled = true; btn.title = KH.t('book.taken'); if (state.time === t) state.time = null; } else any = true;
             if (state.time === t) btn.classList.add('is-sel');
             gr.appendChild(btn);
           });
           sec.appendChild(gr); timesWrap.appendChild(sec);
         });
         if (!any) { var p = document.createElement('div'); p.className = 'bk-noslots'; p.textContent = KH.t('book.no_slots'); timesWrap.appendChild(p); }
+      }
+      // Slots are seeded open, then the real booked times come back from
+      // taken_slots() and disable the matching buttons. The server-side
+      // overlap guard in book_appointment() is the source of truth either way.
+      function buildTimes() {
+        if (!state.dateObj) { timesWrap.innerHTML = ''; return; }
+        var dur = SVC_DUR[state.svc] || 30;
+        var rb = resolveBarberFor(state.dateObj);
+        var slots = [];
+        for (var m = 600; m + dur <= 1200; m += dur) slots.push(m); // 10:00 → 20:00
+        renderTimes(slots, {});
+        if (window.KB) {
+          var reqDate = state.dateObj;
+          KB.takenSlots(rb, reqDate).then(function (arr) {
+            if (state.dateObj !== reqDate) return; // user navigated away
+            var set = {}; (arr || []).forEach(function (t) { set[t] = true; });
+            renderTimes(slots, set);
+            update();
+          });
+        }
       }
       timesWrap.addEventListener('click', function (e) {
         var b = e.target.closest('.bk-time'); if (!b || b.disabled) return;
@@ -1495,11 +1505,68 @@
       var flow = document.getElementById('bkFlow');
       var done = document.getElementById('bkDone');
       var doneSum = document.getElementById('bkDoneSum');
+      // Inline booking-error banner (created lazily above the confirm button).
+      var bkErrEl = null;
+      var ERR_MSG = {
+        slot_taken: 'Dat moment is net bezet — kies een ander tijdstip.',
+        in_past: 'Dat tijdstip is al voorbij — kies een ander.',
+        email_invalid: 'Controleer je e-mailadres.',
+        name_required: 'Vul je voor- en achternaam in.',
+        service_unknown: 'Onbekende dienst — probeer opnieuw.',
+        barber_unknown: 'Onbekende barbier — probeer opnieuw.',
+        _network: 'Geen verbinding met de server — probeer opnieuw.',
+        _default: 'Er ging iets mis — probeer opnieuw.'
+      };
+      function showBookError(code) {
+        if (!bkErrEl) {
+          bkErrEl = document.createElement('div');
+          bkErrEl.setAttribute('role', 'alert');
+          bkErrEl.style.cssText = 'color:#b3261e;background:rgba(206,75,51,.08);border:1px solid rgba(206,75,51,.3);border-radius:6px;padding:10px 12px;margin:0 0 14px;font-size:.92rem;line-height:1.4;';
+          confirmBtn.parentNode.insertBefore(bkErrEl, confirmBtn);
+        }
+        var key = (code || '').toString().split(/[\s:]/)[0];
+        bkErrEl.textContent = '⚠ ' + (ERR_MSG[key] || ERR_MSG._default);
+        bkErrEl.style.display = 'block';
+      }
+      function clearBookError() { if (bkErrEl) bkErrEl.style.display = 'none'; }
+
       confirmBtn.addEventListener('click', function () {
         if (confirmBtn.disabled) return;
-        var who = state.barber && state.barber !== 'any' ? state.barber : KH.t('book.your_barber');
-        doneSum.innerHTML = '<strong>' + svcName(state.svc) + '</strong> — ' + fmtDate(state.dateObj) + ' ' + KH.t('book.at_time') + ' ' + state.time + '<br />' + KH.t('book.with') + ' ' + who + '.<br />' + KH.t('book.for') + ' ' + esc(val(bkFirst) + ' ' + val(bkLast)) + ' · ' + esc(val(bkEmail)) + '<br />' + KH.t('book.confirm_msg');
-        flow.hidden = true; done.hidden = false;
+        clearBookError();
+        function finishOk() {
+          var who = state.barber && state.barber !== 'any' ? state.barber : KH.t('book.your_barber');
+          doneSum.innerHTML = '<strong>' + svcName(state.svc) + '</strong> — ' + fmtDate(state.dateObj) + ' ' + KH.t('book.at_time') + ' ' + state.time + '<br />' + KH.t('book.with') + ' ' + who + '.<br />' + KH.t('book.for') + ' ' + esc(val(bkFirst) + ' ' + val(bkLast)) + ' · ' + esc(val(bkEmail)) + '<br />' + KH.t('book.confirm_msg');
+          flow.hidden = true; done.hidden = false;
+        }
+        // No backend available → keep the original display-only behaviour.
+        if (!window.KB) { finishOk(); return; }
+
+        var dd = state.dateObj;
+        var start = new Date(dd.getFullYear(), dd.getMonth(), dd.getDate(),
+          parseInt(state.time.slice(0, 2), 10), parseInt(state.time.slice(3), 10), 0, 0);
+        var lbl = confirmBtn.textContent;
+        confirmBtn.disabled = true; confirmBtn.textContent = '…';
+
+        KB.book({
+          svc: state.svc,
+          barber: resolveBarberFor(dd),
+          start: start.toISOString(),
+          first: val(bkFirst), last: val(bkLast), email: val(bkEmail),
+          phone: val(bkPhone), note: val(bkNote),
+          lang: (window.KH && KH.lang) || 'nl'
+        }).then(function (res) {
+          confirmBtn.textContent = lbl;
+          if (res && res.error) {
+            confirmBtn.disabled = false;
+            showBookError(res.error.message || res.error.code || '');
+            if (/slot_taken/.test(res.error.message || '')) buildTimes();
+            return;
+          }
+          finishOk();
+        }).catch(function () {
+          confirmBtn.textContent = lbl; confirmBtn.disabled = false;
+          showBookError('_network');
+        });
       });
       document.getElementById('bkReset').addEventListener('click', function () {
         state = { svc: null, price: null, barber: null, dateObj: null, time: null };
