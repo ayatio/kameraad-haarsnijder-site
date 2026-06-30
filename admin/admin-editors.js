@@ -45,12 +45,12 @@
         if (!/^\S+@\S+\.\S+$/.test(em)) e.email = 'Ongeldig e-mailadres.';
         else if (KA.state.customers.some((x) => x.id !== id && x.email.toLowerCase() === em.toLowerCase())) e.email = 'Dit e-mailadres bestaat al.';
         return e; },
-      onSave: (root) => { c.email = root.querySelector('#cEmail').value.trim(); c.phone = root.querySelector('#cPhone').value.trim(); KA.renderKlanten(); KA.toast('Contact bewaard.'); },
+      onSave: (root) => { c.email = root.querySelector('#cEmail').value.trim(); c.phone = root.querySelector('#cPhone').value.trim(); if (KA.db) KA.db.custSave(id, { email: c.email, phone: c.phone }); KA.renderKlanten(); KA.toast('Contact bewaard.'); },
     });
     // opt-ins P-07
     slot.querySelectorAll('.js-opt').forEach((wrap) => {
       const k = wrap.dataset.k;
-      wrap.appendChild(KA.makeToggle(c.optins[k], (on) => { c.optins[k] = on; KA.renderKlanten(); KA.toast(on ? 'Opt-in aan.' : 'Opt-in uit.', { duration: 1800 }); }));
+      wrap.appendChild(KA.makeToggle(c.optins[k], (on) => { c.optins[k] = on; if (KA.db) KA.db.custOptin(id, k, on); KA.renderKlanten(); KA.toast(on ? 'Opt-in aan.' : 'Opt-in uit.', { duration: 1800 }); }));
     });
     // notes
     const notesEl = slot.querySelector('.js-notes');
@@ -61,7 +61,7 @@
       notesEl.querySelectorAll('.js-note-del').forEach((b) => (b.onclick = () => {
         const nid = b.dataset.id; const idx = c.notes.findIndex((n) => n.id === nid); const saved = c.notes[idx];
         KA.confirm({ title: 'Notitie verwijderen?', body: 'Deze notitie wordt verwijderd.', confirmText: 'Verwijder', danger: true, onConfirm: () => {
-          KA.undoable('Notitie verwijderd.', () => { c.notes.splice(idx, 1); renderNotes(); }, () => { c.notes.splice(idx, 0, saved); renderNotes(); });
+          KA.undoable('Notitie verwijderd.', () => { c.notes.splice(idx, 1); if (KA.db) KA.db.custNotes(id, c.notes.map((n) => n.text).join('\n')); renderNotes(); }, () => { c.notes.splice(idx, 0, saved); if (KA.db) KA.db.custNotes(id, c.notes.map((n) => n.text).join('\n')); renderNotes(); });
         } });
       }));
     };
@@ -70,6 +70,7 @@
     slot.querySelector('.js-note-add').onclick = () => {
       const v = noteIn.value.trim(); if (!v) { noteIn.focus(); return; }
       c.notes.unshift({ id: KA.uid('n'), text: v, author: CURRENT_ADMIN, date: 'vandaag' });
+      if (KA.db) KA.db.custNotes(id, c.notes.map((n) => n.text).join('\n'));
       noteIn.value = ''; renderNotes(); KA.toast('Notitie toegevoegd.');
     };
     // history
@@ -86,6 +87,7 @@
     const del = slot.querySelector('.js-cust-del');
     if (del) del.onclick = () => KA.typeConfirm({ title: 'Klant permanent verwijderen', body: `Dit verwijdert ${esc(c.name)}, alle afspraken en e-maillogs onomkeerbaar (GDPR).`, onConfirm: () => {
       const i = KA.state.customers.findIndex((x) => x.id === id); KA.state.customers.splice(i, 1);
+      if (KA.db) KA.db.custDelete(id);
       KA.closeDrawer(true); KA.renderKlanten(); KA.toast('Klant en alle gegevens permanent verwijderd.');
     } });
   };
@@ -113,7 +115,7 @@
       <div class="dw-sec js-fb"></div>`;
     const slot = KA.openDrawer({ title: esc(KA.apptCustName(a)), subtitle: KA.service(a.sv).name + ' · ' + a.start, avatar: KA.initials(KA.apptCustName(a)), body });
 
-    if (a.pref) slot.querySelector('.js-assign').onchange = (e) => { a.barber = e.target.value; a.pref = false; refreshAll(); KA.toast('Barbier toegewezen: ' + KA.barber(a.barber).name); KA.openAppointment(id); };
+    if (a.pref) slot.querySelector('.js-assign').onchange = (e) => { a.barber = e.target.value; a.pref = false; if (KA.db) KA.db.apptAssign(a.id, a.barber); refreshAll(); KA.toast('Barbier toegewezen: ' + KA.barber(a.barber).name); KA.openAppointment(id); };
 
     const fbEl = slot.querySelector('.js-fb');
     const renderFb = () => {
@@ -122,8 +124,8 @@
     };
     renderFb();
 
-    slot.querySelector('.js-complete').onclick = () => { a.status = 'completed'; KA.toast('Afspraak voltooid — telt mee voor omzet.'); refreshAll(); KA.openAppointment(id); };
-    slot.querySelector('.js-noshow').onclick = () => KA.confirm({ title: 'Als no-show markeren?', body: 'Telt mee in de no-show-statistiek. Er vertrekt geen e-mail.', confirmText: 'No-show', onConfirm: () => { a.status = 'noshow'; const c = KA.customer(a.cust); if (c) c.noshows++; KA.toast('Gemarkeerd als no-show.'); refreshAll(); KA.openAppointment(id); } });
+    slot.querySelector('.js-complete').onclick = () => { a.status = 'completed'; if (KA.db) KA.db.apptStatus(a.id, 'completed'); KA.toast('Afspraak voltooid — telt mee voor omzet.'); refreshAll(); KA.openAppointment(id); };
+    slot.querySelector('.js-noshow').onclick = () => KA.confirm({ title: 'Als no-show markeren?', body: 'Telt mee in de no-show-statistiek. Er vertrekt geen e-mail.', confirmText: 'No-show', onConfirm: () => { a.status = 'noshow'; if (KA.db) KA.db.apptStatus(a.id, 'noshow'); const c = KA.customer(a.cust); if (c) c.noshows++; KA.toast('Gemarkeerd als no-show.'); refreshAll(); KA.openAppointment(id); } });
     slot.querySelector('.js-resched').onclick = () => KA.rescheduleAppt(a, () => KA.openAppointment(id));
     slot.querySelector('.js-cancel').onclick = () => KA.cancelAppt(a, () => { KA.closeDrawer(true); });
     ic();
@@ -153,7 +155,7 @@
       <div class="row2"><div class="field"><label class="lbl">Datum</label><input class="in" type="date" value="2026-06-30"></div><div class="field"><label class="lbl">Starttijd</label><input class="in" type="time" value="${a.start}"></div></div>
       <label style="display:flex;gap:8px;align-items:center;font-size:.86rem;margin-top:4px"><input type="checkbox" class="ck" checked> Klant verwittigen per e-mail</label>
       <div class="modal__foot"><button class="b b--ghost" data-close>Annuleren</button><button class="b b--gold js-ok"><i data-lucide="calendar-clock"></i> Verzet</button></div>` });
-    m.card.querySelector('.js-ok').onclick = () => { const t = m.card.querySelector('input[type=time]').value; if (t) a.start = t; m.close(); KA.toast('Verzet — klant gemaild.'); refreshAll(); if (after) after(); };
+    m.card.querySelector('.js-ok').onclick = () => { const t = m.card.querySelector('input[type=time]').value; const d = m.card.querySelector('input[type=date]').value || a.date; if (t) { a.start = t; a.date = d; if (KA.db) KA.db.apptReschedule(a.id, d, t, a.dur); } m.close(); KA.toast('Verzet — klant gemaild.'); refreshAll(); if (after) after(); };
   };
 
   KA.cancelAppt = function (a, after) {
@@ -161,7 +163,7 @@
       <p class="muted" style="font-size:.9rem;margin:0">${esc(KA.apptCustName(a))} · ${esc(KA.service(a.sv).name)} · ${a.start}. Het slot komt weer vrij.</p>
       <label style="display:flex;gap:8px;align-items:center;font-size:.86rem;margin-top:14px"><input type="checkbox" class="ck js-notify" checked> Klant verwittigen per e-mail</label>
       <div class="modal__foot"><button class="b b--ghost" data-close>Terug</button><button class="b b--danger js-ok">Annuleer afspraak</button></div>` });
-    m.card.querySelector('.js-ok').onclick = () => { const notify = m.card.querySelector('.js-notify').checked; a.status = 'cancelled'; m.close(); KA.toast(notify ? 'Afspraak geannuleerd — klant gemaild.' : 'Afspraak geannuleerd.'); refreshAll(); if (after) after(); };
+    m.card.querySelector('.js-ok').onclick = () => { const notify = m.card.querySelector('.js-notify').checked; a.status = 'cancelled'; if (KA.db) KA.db.apptStatus(a.id, 'cancelled'); m.close(); KA.toast(notify ? 'Afspraak geannuleerd — klant gemaild.' : 'Afspraak geannuleerd.'); refreshAll(); if (after) after(); };
   };
 
   /* ============ S-07 · BARBER EDIT HUB / CREATE ============ */
@@ -196,10 +198,10 @@
     slot.querySelector('.js-active').appendChild(KA.makeToggle(b.active, (on) => {
       if (!create && !on) {
         const future = KA.state.appts.filter((x) => x.barber === b.id && x.status === 'confirmed').length;
-        if (future) { KA.confirm({ title: 'Barbier deactiveren?', body: `${esc(b.name)} heeft ${future} toekomstige afspraak(en). Die blijven staan; de barbier verdwijnt van de site en uit nieuwe boekingen.`, confirmText: 'Deactiveer', onConfirm: () => { b.active = false; refreshAll(); KA.toast(b.name + ' gedeactiveerd.'); } });
+        if (future) { KA.confirm({ title: 'Barbier deactiveren?', body: `${esc(b.name)} heeft ${future} toekomstige afspraak(en). Die blijven staan; de barbier verdwijnt van de site en uit nieuwe boekingen.`, confirmText: 'Deactiveer', onConfirm: () => { b.active = false; if (KA.db) KA.db.barberActive(b.id, false); refreshAll(); KA.toast(b.name + ' gedeactiveerd.'); } });
           return false; }
       }
-      activeState = on; if (!create) { b.active = on; refreshAll(); KA.toast(on ? b.name + ' actief.' : b.name + ' inactief.'); }
+      activeState = on; if (!create) { b.active = on; if (KA.db) KA.db.barberActive(b.id, on); refreshAll(); KA.toast(on ? b.name + ' actief.' : b.name + ' inactief.'); }
       return true;
     }));
 
@@ -213,9 +215,10 @@
         if (create) {
           const nb = { id: KA.uid('b'), photo: b._newPhoto || '', active: activeState, order: KA.state.barbers.length + 1, services: KA.activeServices().map((s) => s.id), hours: KA.barber('b-avraz').hours.map((d) => d.map((w) => ({ ...w }))), ...data };
           KA.state.barbers.push(nb);
-          if (root.querySelector('#bInvite') && root.querySelector('#bInvite').checked) KA.state.admins.push({ id: KA.uid('ad'), name: data.name, email: (data.slug || data.name.toLowerCase()) + '@kameraadhaarsnijder.be', role: 'barber', linked: nb.id, last: '—', status: 'invited' });
+          if (KA.db) KA.db.barberCreate(nb, nb.id);
+          if (root.querySelector('#bInvite') && root.querySelector('#bInvite').checked) { const ad = { id: KA.uid('ad'), name: data.name, email: (data.slug || data.name.toLowerCase()) + '@kameraadhaarsnijder.be', role: 'barber', linked: nb.id, last: '—', status: 'invited' }; KA.state.admins.push(ad); if (KA.db) KA.db.adminInvite({ email: ad.email, role: 'barber', linked: nb.id }, ad.id); }
           refreshAll(); KA.toast(data.name + ' toegevoegd.'); KA.closeDrawer(true);
-        } else { Object.assign(b, data); if (b._newPhoto) { b.photo = b._newPhoto; delete b._newPhoto; } refreshAll(); KA.toast('Barbier bewaard.'); }
+        } else { Object.assign(b, data); if (b._newPhoto) { b.photo = b._newPhoto; delete b._newPhoto; } if (KA.db) KA.db.barberSave(b.id, data); refreshAll(); KA.toast('Barbier bewaard.'); }
       },
       onCancel: () => KA.closeDrawer(true),
     });
@@ -225,7 +228,7 @@
     if (delB) delB.onclick = () => {
       const future = KA.state.appts.filter((x) => x.barber === b.id && x.status !== 'cancelled' && x.status !== 'completed').length;
       if (future) { KA.confirm({ title: 'Kan niet hard verwijderen', icon: 'info', body: `${esc(b.name)} heeft nog lopende afspraken. Deactiveer in plaats daarvan — de historie blijft bewaard.`, confirmText: 'Deactiveer', onConfirm: () => { b.active = false; refreshAll(); KA.closeDrawer(true); KA.toast(b.name + ' gedeactiveerd.'); } }); return; }
-      KA.confirm({ title: 'Barbier verwijderen?', body: `${esc(b.name)} wordt verwijderd.`, confirmText: 'Verwijder', danger: true, onConfirm: () => { const i = KA.state.barbers.findIndex((x) => x.id === b.id); KA.state.barbers.splice(i, 1); refreshAll(); KA.closeDrawer(true); KA.toast(b.name + ' verwijderd.'); } });
+      KA.confirm({ title: 'Barbier verwijderen?', body: `${esc(b.name)} wordt verwijderd.`, confirmText: 'Verwijder', danger: true, onConfirm: () => { if (KA.db) KA.db.barberDelete(b.id); const i = KA.state.barbers.findIndex((x) => x.id === b.id); KA.state.barbers.splice(i, 1); refreshAll(); KA.closeDrawer(true); KA.toast(b.name + ' verwijderd.'); } });
     };
     ic();
   };
@@ -242,7 +245,7 @@
         <div class="row2"><div class="field"><label class="lbl">EN</label><textarea class="in" id="dEn" rows="2">${esc(s.desc.en)}</textarea></div><div class="field"><label class="lbl">FR</label><textarea class="in" id="dFr" rows="2">${esc(s.desc.fr)}</textarea></div></div>
         <div class="savebar"><span class="dirty js-dirty"><span class="dot"></span> Niet bewaard</span><button class="b b--ghost js-cancel">Annuleren</button><button class="b b--gold js-save" disabled><i data-lucide="check"></i> Bewaar</button></div></div>`;
       const slot = KA.openDrawer({ title: esc(s.name), subtitle: 'Info-dienst', avatar: '', body });
-      KA.form(slot.querySelector('.js-sform'), { onSave: (r) => { s.name = r.querySelector('#sName').value; s.desc = { nl: r.querySelector('#dNl').value, en: r.querySelector('#dEn').value, fr: r.querySelector('#dFr').value }; KA.renderDiensten(); KA.toast('Bewaard.'); }, onCancel: () => KA.closeDrawer(true) });
+      KA.form(slot.querySelector('.js-sform'), { onSave: (r) => { s.name = r.querySelector('#sName').value; s.desc = { nl: r.querySelector('#dNl').value, en: r.querySelector('#dEn').value, fr: r.querySelector('#dFr').value }; if (KA.db) KA.db.svcSave(s.id, { name: s.name, price: s.price, dur: s.dur, color: s.color, active: s.active, desc: s.desc }); KA.renderDiensten(); KA.toast('Bewaard.'); }, onCancel: () => KA.closeDrawer(true) });
       ic(); return;
     }
     const body = `<div class="dw-sec js-sform">
@@ -258,14 +261,14 @@
     const slot = KA.openDrawer({ title: create ? 'Nieuwe dienst' : esc(s.name), subtitle: create ? 'Voeg een dienst toe' : 'Bewerk dienst', avatar: '', body });
     let color = s.color, active = s.active;
     slot.querySelectorAll('.js-swatch').forEach((sw) => (sw.onclick = () => { color = sw.dataset.c; slot.querySelectorAll('.js-swatch').forEach((x) => (x.style.borderColor = 'transparent')); sw.style.borderColor = 'var(--ink)'; slot.querySelector('.js-sform').dispatchEvent(new Event('change', { bubbles: true })); }));
-    slot.querySelector('.js-active').appendChild(KA.makeToggle(s.active, (on) => { active = on; if (!create) { s.active = on; KA.renderDiensten(); KA.toast(on ? 'Actief.' : 'Inactief.'); } }));
+    slot.querySelector('.js-active').appendChild(KA.makeToggle(s.active, (on) => { active = on; if (!create) { s.active = on; if (KA.db) KA.db.svcActive(s.id, on); KA.renderDiensten(); KA.toast(on ? 'Actief.' : 'Inactief.'); } }));
     const durEl = slot.querySelector('#sDur'); durEl.addEventListener('input', () => { if (!create && +durEl.value !== s.dur) slot.querySelector('#durNote').hidden = false; });
     KA.form(slot.querySelector('.js-sform'), {
       validate: (r) => { const e = {}; if (!r.querySelector('#sName').value.trim()) e.name = 'Naam verplicht.'; if (+r.querySelector('#sPrice').value < 0) e.price = 'Ongeldig.'; if (+r.querySelector('#sDur').value < 5) e.dur = 'Min. 5 min.'; return e; },
       onSave: (r) => {
         const data = { name: r.querySelector('#sName').value.trim(), price: +r.querySelector('#sPrice').value, dur: +r.querySelector('#sDur').value, color, active, desc: { nl: r.querySelector('#dNl').value, en: r.querySelector('#dEn').value, fr: r.querySelector('#dFr').value } };
-        if (create) { const ns = { id: KA.uid('sv'), walkin: false, order: KA.state.services.length + 1, ...data }; KA.state.services.push(ns); KA.state.barbers.forEach((b) => b.services.push(ns.id)); KA.renderDiensten(); KA.toast(data.name + ' toegevoegd.'); KA.closeDrawer(true); }
-        else { Object.assign(s, data); KA.renderDiensten(); KA.renderAgenda(); KA.toast('Dienst bewaard.'); }
+        if (create) { const ns = { id: KA.uid('sv'), walkin: false, order: KA.state.services.length + 1, ...data }; KA.state.services.push(ns); KA.state.barbers.forEach((b) => b.services.push(ns.id)); if (KA.db) KA.db.svcCreate(ns, ns.id); KA.renderDiensten(); KA.toast(data.name + ' toegevoegd.'); KA.closeDrawer(true); }
+        else { Object.assign(s, data); if (KA.db) KA.db.svcSave(s.id, data); KA.renderDiensten(); KA.renderAgenda(); KA.toast('Dienst bewaard.'); }
       }, onCancel: () => KA.closeDrawer(true),
     });
     ic();
@@ -287,7 +290,7 @@
     const card = m.card;
     card.querySelector('#addW2').onclick = () => { card.querySelector('#w2wrap').hidden = false; card.querySelector('#addW2').hidden = true; };
     const commit = (newWins) => {
-      const apply = () => { if (sc === 'shop') KA.state.shopHours[dayIdx] = newWins; else if (sc === 'all') KA.state.barbers.forEach((b) => (b.hours[dayIdx] = newWins.map((w) => ({ ...w })))); else KA.barber(sc).hours[dayIdx] = newWins; KA.renderBeschikbaarheid(); m.close(); KA.toast(newWins.length ? 'Uren bewaard.' : 'Dag gesloten.'); };
+      const apply = () => { if (sc === 'shop') KA.state.shopHours[dayIdx] = newWins; else if (sc === 'all') KA.state.barbers.forEach((b) => (b.hours[dayIdx] = newWins.map((w) => ({ ...w })))); else KA.barber(sc).hours[dayIdx] = newWins; if (KA.db) KA.db.hours(sc, dayIdx, newWins); KA.renderBeschikbaarheid(); m.close(); KA.toast(newWins.length ? 'Uren bewaard.' : 'Dag gesloten.'); };
       // conflict check on shrink (demo: only the seeded Tue case for a barber)
       const conflicts = (sc !== 'shop') && dayIdx === 1 && newWins.length === 0 ? KA.state.appts.filter((a) => (sc === 'all' || a.barber === sc) && a.status === 'confirmed').map((a) => ({ label: KA.apptCustName(a) + ' · ' + a.start, sub: KA.service(a.sv).name + ' · ' + KA.barber(a.barber).name })) : [];
       if (conflicts.length) { KA.conflictModal({ changeLabel: KA.DAYS[dayIdx] + ' sluiten', conflicts, onApply: () => apply() }); }
@@ -315,7 +318,7 @@
     const m = KA.modal({ card: `<h2 class="serif">Kopieer uren van ${esc(KA.barber(from).name)}</h2><p class="muted" style="font-size:.86rem;margin:2px 0 12px">Naar wie?</p>
       ${others.map((b) => `<label class="toggle-row" style="cursor:pointer"><input type="checkbox" class="ck js-t" data-id="${b.id}"><span class="tt"><b>${esc(b.name)}</b></span></label>`).join('')}
       <div class="modal__foot"><button class="b b--ghost" data-close>Annuleren</button><button class="b b--gold js-ok"><i data-lucide="copy"></i> Kopieer</button></div>` });
-    m.card.querySelector('.js-ok').onclick = () => { const ids = Array.from(m.card.querySelectorAll('.js-t:checked')).map((c) => c.dataset.id); if (!ids.length) { KA.toast('Niemand gekozen.', { type: 'err' }); return; } const srcH = KA.barber(from).hours; ids.forEach((id) => (KA.barber(id).hours = srcH.map((d) => d.map((w) => ({ ...w }))))); m.close(); KA.toast('Uren gekopieerd naar ' + ids.length + ' barbier(s).'); };
+    m.card.querySelector('.js-ok').onclick = () => { const ids = Array.from(m.card.querySelectorAll('.js-t:checked')).map((c) => c.dataset.id); if (!ids.length) { KA.toast('Niemand gekozen.', { type: 'err' }); return; } const srcH = KA.barber(from).hours; ids.forEach((id) => (KA.barber(id).hours = srcH.map((d) => d.map((w) => ({ ...w }))))); if (KA.db) KA.db.copyHours(from, ids); m.close(); KA.toast('Uren gekopieerd naar ' + ids.length + ' barbier(s).'); };
     ic();
   };
 
@@ -330,7 +333,7 @@
       const reason = m.card.querySelector('#blReason').value.trim() || 'Blokkade';
       const who = m.card.querySelector('#blWho').value; const from = m.card.querySelector('#blFrom').value, to = m.card.querySelector('#blTo').value;
       const range = from === to ? new Date(from).getDate() + ' ' + KA.MONTHS[new Date(from).getMonth()].slice(0, 3) + ' ' + new Date(from).getFullYear() + ' · hele dag' : 'van ' + from + ' tot ' + to;
-      const add = () => { KA.state.blocks.push({ id: KA.uid('bl'), label: reason, who, day: from, allday: true, start: '', end: '', range }); KA.renderBeschikbaarheid(); m.close(); KA.toast('Blokkade toegevoegd.'); };
+      const add = () => { const nb = { id: KA.uid('bl'), label: reason, who, day: from, allday: true, start: '', end: '', range }; KA.state.blocks.push(nb); if (KA.db) KA.db.blockAdd({ who, from, to, label: reason }, nb.id); KA.renderBeschikbaarheid(); m.close(); KA.toast('Blokkade toegevoegd.'); };
       // conflict demo: if covers today
       const covers = from <= '2026-06-30' && to >= '2026-06-30';
       const conflicts = covers ? KA.state.appts.filter((a) => (who === 'all' || a.barber === who) && a.status === 'confirmed').map((a) => ({ label: KA.apptCustName(a) + ' · ' + a.start, sub: KA.service(a.sv).name })) : [];
@@ -357,7 +360,7 @@
         if (!/^\S+@\S+\.\S+$/.test(email)) { f.classList.add('bad'); f.querySelector('.ferr span').textContent = ' Ongeldig e-mailadres.'; return; }
         if (KA.state.admins.some((x) => x.email.toLowerCase() === email.toLowerCase())) { f.classList.add('bad'); f.querySelector('.ferr span').textContent = ' Bestaat al als beheerder.'; return; }
         const role = m.card.querySelector('.js-role .on').dataset.v; const link = m.card.querySelector('#adLink').value;
-        KA.state.admins.push({ id: KA.uid('ad'), name: email.split('@')[0].replace(/^./, (c) => c.toUpperCase()), email, role, linked: link || null, last: '—', status: 'invited' });
+        const ad = { id: KA.uid('ad'), name: email.split('@')[0].replace(/^./, (c) => c.toUpperCase()), email, role, linked: link || null, last: '—', status: 'invited' }; KA.state.admins.push(ad); if (KA.db) KA.db.adminInvite({ email, role, linked: link || null }, ad.id);
         KA.renderBeheerders(); m.close(); KA.toast('Uitnodiging verstuurd naar ' + email + '.');
       };
       ic(); return;
@@ -372,10 +375,10 @@
     const m = KA.modal({ card: `<h2 class="serif">${esc(a.name)}</h2><p class="muted" style="font-size:.86rem;margin:2px 0 14px">${esc(a.email)}</p>
       <div class="field"><label class="lbl">Rol</label><div class="seg js-role"><button class="${a.role === 'barber' ? 'on' : ''}" data-v="barber" ${isLastOwner ? 'disabled' : ''}>Barbier</button><button class="${a.role === 'owner' ? 'on' : ''}" data-v="owner">Eigenaar</button></div>${isLastOwner ? '<div class="hint">Laatste eigenaar — rol kan niet gewijzigd worden.</div>' : ''}</div>
       <div class="modal__foot"><div class="grow" style="display:flex;gap:8px">${actions}</div><button class="b b--ghost" data-close>Sluiten</button></div>` });
-    if (!isLastOwner) KA.wireSeg(m.card.querySelector('.js-role'), (i, btn) => { a.role = btn.dataset.v; KA.renderBeheerders(); KA.toast('Rol gewijzigd naar ' + (a.role === 'owner' ? 'Eigenaar' : 'Barbier') + '.'); });
+    if (!isLastOwner) KA.wireSeg(m.card.querySelector('.js-role'), (i, btn) => { a.role = btn.dataset.v; if (KA.db) KA.db.adminRole(a.id, a.role); KA.renderBeheerders(); KA.toast('Rol gewijzigd naar ' + (a.role === 'owner' ? 'Eigenaar' : 'Barbier') + '.'); });
     const q = (s) => m.card.querySelector(s);
     if (q('.js-resend')) q('.js-resend').onclick = () => { a.status = 'invited'; KA.renderBeheerders(); KA.toast('Uitnodiging opnieuw verstuurd.'); };
-    if (q('.js-revoke')) q('.js-revoke').onclick = () => KA.confirm({ title: 'Uitnodiging intrekken?', body: 'De link wordt ongeldig en de rij verdwijnt.', confirmText: 'Intrekken', danger: true, onConfirm: () => { const i = KA.state.admins.findIndex((x) => x.id === a.id); KA.state.admins.splice(i, 1); KA.renderBeheerders(); m.close(); KA.toast('Uitnodiging ingetrokken.'); } });
+    if (q('.js-revoke')) q('.js-revoke').onclick = () => KA.confirm({ title: 'Uitnodiging intrekken?', body: 'De link wordt ongeldig en de rij verdwijnt.', confirmText: 'Intrekken', danger: true, onConfirm: () => { if (KA.db) KA.db.adminDelete(a.id); const i = KA.state.admins.findIndex((x) => x.id === a.id); KA.state.admins.splice(i, 1); KA.renderBeheerders(); m.close(); KA.toast('Uitnodiging ingetrokken.'); } });
     if (q('.js-deact')) q('.js-deact').onclick = () => KA.confirm({ title: 'Beheerder deactiveren?', body: esc(a.name) + ' kan niet meer inloggen. Account blijft bewaard voor audit.', confirmText: 'Deactiveer', danger: true, onConfirm: () => { a.status = 'inactive'; KA.renderBeheerders(); m.close(); KA.toast(a.name + ' gedeactiveerd.'); } });
     if (q('.js-react')) q('.js-react').onclick = () => { a.status = 'active'; KA.renderBeheerders(); m.close(); KA.toast(a.name + ' geheractiveerd.'); };
     ic();

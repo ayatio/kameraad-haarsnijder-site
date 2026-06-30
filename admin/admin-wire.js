@@ -130,8 +130,11 @@
       const name = m.card.querySelector('#naCust').value.trim() || (walkin ? 'Walk-in' : '');
       if (!name) { KA.toast('Vul een klant in.', { type: 'err' }); return; }
       const svId = m.card.querySelector('#naSvc').value; const sv = KA.service(svId);
-      const a = { id: KA.uid('a'), start: m.card.querySelector('#naTime').value, dur: sv.dur || 30, cust: 'walkin', custName: name, sv: svId, barber: m.card.querySelector('#naBarber').value, status: 'confirmed', rating: null, reason: '', pref: false };
-      KA.state.appts.push(a); KA.refreshAll(); m.close(); KA.toast(walkin ? 'Walk-in toegevoegd.' : 'Afspraak geboekt — klant gemaild.');
+      const dateStr = (KA.agenda && KA.agenda.date) ? new Date(KA.agenda.date).toLocaleDateString('en-CA') : new Date().toLocaleDateString('en-CA');
+      const a = { id: KA.uid('a'), date: dateStr, start: m.card.querySelector('#naTime').value, dur: sv.dur || 30, cust: 'walkin', custName: name, sv: svId, barber: m.card.querySelector('#naBarber').value, status: 'confirmed', rating: null, reason: '', pref: false };
+      KA.state.appts.push(a); if (KA._allAppts) KA._allAppts.push(a);
+      if (KA.db) KA.db.apptCreate({ svKaId: svId, barberKaId: a.barber, dateStr, time: a.start, durMin: a.dur, custName: name }, a.id);
+      KA.refreshAll(); m.close(); KA.toast(walkin ? 'Walk-in toegevoegd.' : 'Afspraak geboekt — klant gemaild.');
     };
     m.card.querySelector('.js-ok').onclick = () => make(false);
     m.card.querySelector('#naWalkin').onclick = () => make(true);
@@ -157,8 +160,8 @@
       mount.innerHTML = `<div class="bulkbar"><span class="cnt">${ids.length} geselecteerd</span><div class="sp"><button class="b b--ghost b--sm" id="bExport"><i data-lucide="download"></i> Exporteer</button><button class="b b--ghost b--sm" id="bOptout">Opt-out</button><button class="b b--danger b--sm" id="bDel"><i data-lucide="trash-2"></i> Verwijder</button></div></div>`;
       ic();
       $('#bExport').onclick = () => KA.exportSheet({ title: ids.length + ' klanten exporteren', sections: [{ label: 'Contactgegevens', on: true }, { label: 'Historie' }], allowFormats: ['CSV', 'XLSX', 'JSON'] });
-      $('#bOptout').onclick = () => KA.confirm({ title: 'Marketing uitschakelen?', body: `Voor ${ids.length} klant(en) wordt marketing-opt-in uitgezet.`, confirmText: 'Uitschakelen', onConfirm: () => { ids.forEach((id) => (KA.customer(id).optins.marketing = false)); KA.renderKlanten($('#klantSearch').value); KA.toast(ids.length + ' klant(en) afgemeld.'); } });
-      $('#bDel').onclick = () => KA.typeConfirm({ title: ids.length + ' klanten verwijderen', body: `Dit verwijdert ${ids.length} klant(en) en al hun gegevens onomkeerbaar (GDPR).`, word: 'VERWIJDER', onConfirm: () => { ids.forEach((id) => { const i = KA.state.customers.findIndex((c) => c.id === id); if (i > -1) KA.state.customers.splice(i, 1); }); KA.renderKlanten($('#klantSearch').value); $('#bulkMount').innerHTML = ''; KA.toast(ids.length + ' klant(en) verwijderd.'); } });
+      $('#bOptout').onclick = () => KA.confirm({ title: 'Marketing uitschakelen?', body: `Voor ${ids.length} klant(en) wordt marketing-opt-in uitgezet.`, confirmText: 'Uitschakelen', onConfirm: () => { ids.forEach((id) => { KA.customer(id).optins.marketing = false; if (KA.db) KA.db.custOptin(id, 'marketing', false); }); KA.renderKlanten($('#klantSearch').value); KA.toast(ids.length + ' klant(en) afgemeld.'); } });
+      $('#bDel').onclick = () => KA.typeConfirm({ title: ids.length + ' klanten verwijderen', body: `Dit verwijdert ${ids.length} klant(en) en al hun gegevens onomkeerbaar (GDPR).`, word: 'VERWIJDER', onConfirm: () => { ids.forEach((id) => { if (KA.db) KA.db.custDelete(id); const i = KA.state.customers.findIndex((c) => c.id === id); if (i > -1) KA.state.customers.splice(i, 1); }); KA.renderKlanten($('#klantSearch').value); $('#bulkMount').innerHTML = ''; KA.toast(ids.length + ' klant(en) verwijderd.'); } });
     }
   }
 
@@ -174,6 +177,7 @@
       e.preventDefault();
       const arr = KA.barbersSorted(); const from = arr.findIndex((b) => b.id === dragId), to = arr.findIndex((b) => b.id === tr.dataset.barber);
       const [m] = arr.splice(from, 1); arr.splice(to, 0, m); arr.forEach((b, i) => (b.order = i + 1));
+      if (KA.db) KA.db.barberReorder(arr.map((b) => b.id));
       dragId = null; KA.renderBarbiers(); KA.toast('Volgorde aangepast.', { duration: 1600 });
     });
   }
@@ -187,10 +191,10 @@
       if (has) {
         if (b.services.filter((x) => KA.service(x) && !KA.service(x).walkin).length <= 1) { KA.toast('Dit is de laatste dienst van ' + b.name + ' — minstens één blijft nodig.', { type: 'err' }); return; }
         const others = KA.state.barbers.filter((x) => x.id !== b.id && x.services.includes(sId)).length;
-        const doRemove = () => { b.services = b.services.filter((x) => x !== sId); KA.renderDiensten(); KA.renderBarbiers(); };
+        const doRemove = () => { b.services = b.services.filter((x) => x !== sId); if (KA.db) KA.db.matrix(b.id, sId, false); KA.renderDiensten(); KA.renderBarbiers(); };
         if (others === 0) KA.confirm({ title: 'Laatste barbier voor deze dienst', body: KA.service(sId).name + ' wordt door niemand meer aangeboden en verdwijnt uit boekingen.', confirmText: 'Toch weghalen', danger: true, onConfirm: doRemove });
         else doRemove();
-      } else { b.services.push(sId); KA.renderDiensten(); KA.renderBarbiers(); }
+      } else { b.services.push(sId); if (KA.db) KA.db.matrix(b.id, sId, true); KA.renderDiensten(); KA.renderBarbiers(); }
     });
   }
 
@@ -215,7 +219,7 @@
   /* ---------- INSTELLINGEN (P-01) ---------- */
   function initInstellingen() {
     const root = $('#settingsForm'); if (!root) return;
-    KA.form(root, { onSave: () => { const s = KA.state.settings; s.cancelWindow = +$('#setCancel').value; s.buffer = +$('#setBuffer').value; s.leadTime = +$('#setLead').value; s.horizon = +$('#setHorizon').value; s.interval = +$('#setInterval').value; s.rebook = +$('#setRebook').value; KA.toast('Opgeslagen — geldt voor nieuwe boekingen.'); }, onCancel: () => route() });
+    KA.form(root, { onSave: () => { const s = KA.state.settings; s.cancelWindow = +$('#setCancel').value; s.buffer = +$('#setBuffer').value; s.leadTime = +$('#setLead').value; s.horizon = +$('#setHorizon').value; s.interval = +$('#setInterval').value; s.rebook = +$('#setRebook').value; if (KA.db) KA.db.settings(s); KA.toast('Opgeslagen — geldt voor nieuwe boekingen.'); }, onCancel: () => route() });
   }
 
   /* ---------- BANNER ---------- */
@@ -227,10 +231,10 @@
     KA.wireSeg($('#bnrLocale'), (i, btn) => { save(); locale = btn.textContent.toLowerCase(); load(); });
     const updatePreview = () => { const pv = $('#bnrPreview'); if (!pv) return; const active = KA.state.banner.active; pv.querySelector('.strip').innerHTML = active ? `<b>${KA.esc($('#bnrTitle').value || '—')}</b> — ${KA.esc($('#bnrText').value || '')}` : '<span class="muted">Banner staat uit</span>'; };
     root.addEventListener('input', updatePreview);
-    $('#bnrSave').onclick = () => { save(); KA.toast('Banner opgeslagen — live binnen 60 s.'); };
+    $('#bnrSave').onclick = () => { save(); if (KA.db) KA.db.banner(KA.state.banner); KA.toast('Banner opgeslagen — live binnen 60 s.'); };
     const toggleWrap = $('#bnrActive');
     const setActiveUI = () => { $('#bnrStatus').innerHTML = KA.state.banner.active ? '<span class="bdg bdg--ok"><span class="dot" style="background:#2e6b4f"></span> Actief</span>' : '<span class="bdg bdg--mut">Uit</span>'; updatePreview(); };
-    toggleWrap.appendChild(KA.makeToggle(KA.state.banner.active, (on) => { if (on && !$('#bnrTitle').value.trim() && !KA.state.banner.nl.title.trim()) { KA.toast('Vul eerst de NL-titel in om te activeren.', { type: 'err' }); return false; } KA.state.banner.active = on; setActiveUI(); KA.toast(on ? 'Banner staat aan.' : 'Banner staat uit.'); }));
+    toggleWrap.appendChild(KA.makeToggle(KA.state.banner.active, (on) => { if (on && !$('#bnrTitle').value.trim() && !KA.state.banner.nl.title.trim()) { KA.toast('Vul eerst de NL-titel in om te activeren.', { type: 'err' }); return false; } KA.state.banner.active = on; if (KA.db) KA.db.banner(KA.state.banner); setActiveUI(); KA.toast(on ? 'Banner staat aan.' : 'Banner staat uit.'); }));
     load(); setActiveUI();
   }
 
@@ -263,11 +267,11 @@
       const toMatrix = t.closest('.js-tomatrix'); if (toMatrix) { e.preventDefault(); KA._scrollMatrix = true; location.hash = '#diensten'; return; }
       const editDay = t.closest('.js-edit-day'); if (editDay) { KA.openDayEditor(+editDay.dataset.d); return; }
       const copyH = t.closest('.js-copy-hours'); if (copyH) { KA.copyHours(); return; }
-      const delBlock = t.closest('.js-del-block'); if (delBlock) { const id = delBlock.dataset.id; const i = KA.state.blocks.findIndex((b) => b.id === id); const saved = KA.state.blocks[i]; KA.confirm({ title: 'Blokkade verwijderen?', body: 'Deze periode wordt weer vrijgegeven.', confirmText: 'Verwijder', danger: true, onConfirm: () => KA.undoable('Blokkade verwijderd.', () => { KA.state.blocks.splice(i, 1); KA.renderBeschikbaarheid(); }, () => { KA.state.blocks.splice(i, 0, saved); KA.renderBeschikbaarheid(); }) }); return; }
+      const delBlock = t.closest('.js-del-block'); if (delBlock) { const id = delBlock.dataset.id; const i = KA.state.blocks.findIndex((b) => b.id === id); const saved = KA.state.blocks[i]; KA.confirm({ title: 'Blokkade verwijderen?', body: 'Deze periode wordt weer vrijgegeven.', confirmText: 'Verwijder', danger: true, onConfirm: () => { if (KA.db) KA.db.blockDelete(id); KA.undoable('Blokkade verwijderd.', () => { KA.state.blocks.splice(i, 1); KA.renderBeschikbaarheid(); }, () => { KA.state.blocks.splice(i, 0, saved); KA.renderBeschikbaarheid(); }); } }); return; }
       const clearF = t.closest('.js-clear'); if (clearF) { e.preventDefault(); if ($('#klantSearch')) $('#klantSearch').value = ''; KA.renderKlanten(''); return; }
       // free slot / appt / block in agenda
       const free = t.closest('.ev--free'); if (free) { newAppt(free.dataset.b, +free.dataset.min); return; }
-      const block = t.closest('[data-block]'); if (block) { const bl = KA.state.blocks.find((b) => b.id === block.dataset.block); if (bl) KA.confirm({ title: 'Pauze / blokkade', body: KA.esc(bl.label) + (bl.start ? ` · ${bl.start}–${bl.end}` : ''), confirmText: 'Verwijder', cancelText: 'Sluiten', danger: true, onConfirm: () => { const i = KA.state.blocks.findIndex((x) => x.id === bl.id); KA.undoable('Blokkade verwijderd.', () => { KA.state.blocks.splice(i, 1); KA.renderAgenda(); KA.renderBeschikbaarheid(); }, () => { KA.state.blocks.splice(i, 0, bl); KA.renderAgenda(); KA.renderBeschikbaarheid(); }); } }); return; }
+      const block = t.closest('[data-block]'); if (block) { const bl = KA.state.blocks.find((b) => b.id === block.dataset.block); if (bl) KA.confirm({ title: 'Pauze / blokkade', body: KA.esc(bl.label) + (bl.start ? ` · ${bl.start}–${bl.end}` : ''), confirmText: 'Verwijder', cancelText: 'Sluiten', danger: true, onConfirm: () => { const i = KA.state.blocks.findIndex((x) => x.id === bl.id); if (KA.db) KA.db.blockDelete(bl.id); KA.undoable('Blokkade verwijderd.', () => { KA.state.blocks.splice(i, 1); KA.renderAgenda(); KA.renderBeschikbaarheid(); }, () => { KA.state.blocks.splice(i, 0, bl); KA.renderAgenda(); KA.renderBeschikbaarheid(); }); } }); return; }
       const apptEl = t.closest('[data-appt]'); if (apptEl) { KA.openAppointment(apptEl.dataset.appt); return; }
       const monthCell = t.closest('.ag-month .mc[data-day]'); if (monthCell && !monthCell.classList.contains('out')) { const parts = monthCell.dataset.day.split('-'); KA.agenda.date = new Date(+parts[0], +parts[1] - 1, +parts[2]); KA.agenda.view = 'day'; $('#agSeg').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === 0)); KA.renderAgenda(); return; }
       const custRow = t.closest('tr[data-cust]'); if (custRow && !t.closest('.ck') && !t.closest('.ckcell')) { KA.openCustomer(custRow.dataset.cust); return; }
