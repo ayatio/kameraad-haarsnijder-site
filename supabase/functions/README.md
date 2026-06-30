@@ -18,9 +18,9 @@ two FKs from `appointments` to `barbers` (`barber_id` + `resolved_by`), so a bar
 
 ## Secrets / config
 - `RESEND_API_KEY` — currently inlined (demo). **Rotate** and move to a function secret.
-- `FROM` — `Kameraad Haarsnijder <afspraak@mail.kameraadhaarsnijder.be>` (domain
+- `FROM` — `Kameraad Haarsnijder <info@mail.kameraadhaarsnijder.be>` (domain
   `mail.kameraadhaarsnijder.be` verified in Resend 2026-07-01; all three functions
-  send from it and now reach any recipient). The apex `kameraadhaarsnijder.be` is
+  send from it and reach any recipient). The apex `kameraadhaarsnijder.be` is
   **not** verified — use the `mail.` subdomain sender.
 
 ## Cron
