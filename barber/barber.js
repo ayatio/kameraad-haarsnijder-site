@@ -276,7 +276,7 @@
     if (cid === GENERIC_CUST) { toast('Gedeeld walk-in profiel — geen klantgegevens.'); return; }
     Promise.all([
       sb.from('customers').select('id,first_name,last_name,email,phone,notes,no_show_count,marketing_opt_in,reminder_opt_in,created_at').eq('id', cid).single(),
-      sb.from('appointments').select('start_at,status,nps_rating,nps_note,services(name_nl),barbers(name)').eq('customer_id', cid).order('start_at', { ascending: false }).limit(40)
+      sb.from('appointments').select('start_at,status,nps_rating,nps_note,services(name_nl),barbers!appointments_barber_id_fkey(name)').eq('customer_id', cid).order('start_at', { ascending: false }).limit(40)
     ]).then(function (res) {
       var c = res[0].data; if (!c) { toast('Klant niet gevonden.'); return; }
       var hist = res[1].data || [];
