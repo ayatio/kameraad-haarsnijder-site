@@ -1006,7 +1006,7 @@
   <script src="image-slot.js?v=2"></script>
   <script src="i18n.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="booking.js?v=3"></script>
+  <script src="booking.js?v=4"></script>
   <script>
     // Entrance motion via IntersectionObserver, with guaranteed reveal.
     (function () {
@@ -1214,7 +1214,11 @@
       ];
       function eligibleBarbersForSvc() { return BARBERS.filter(function (b) { return b.does.indexOf(state.svc) >= 0; }); }
       function isAway(b, d) { if (!b.away || !b.away.length) return false; var t = d.getTime(); return b.away.some(function (r) { return t >= r.from.getTime() && t <= r.to.getTime(); }); }
-      function worksOn(b, d) { return b.works.indexOf(d.getDay()) >= 0 && !isAway(b, d); }
+      function worksOn(b, d) {
+        if (b.works.indexOf(d.getDay()) < 0) return false;
+        if (window.KB && KB.isBlocked) return !KB.isBlocked(b.id.toLowerCase(), d); // real closures/holidays
+        return !isAway(b, d);
+      }
       // Latest valid start (15-min grid, last start = window end − occupancy).
       function lastStartMin() {
         var occ = durOf(state.svc) + (CFG.bufferMin || 0), last = -1;
@@ -1260,8 +1264,11 @@
       function applyCatalogue() {
         var allSlugs = KB.SERVICES.map(function (s) { return s.slug; });
         BARBERS.forEach(function (bb) {
-          var m = KB.MATRIX[bb.id.toLowerCase()];
+          var slug = bb.id.toLowerCase();
+          var m = KB.MATRIX[slug];
           bb.does = (m && m.length) ? m.slice() : allSlugs.slice();
+          // Real working weekdays from the DB roster (else keep built-in fallback).
+          if (window.KB && KB.ROSTER && KB.ROSTER[slug] && KB.ROSTER[slug].length) bb.works = KB.ROSTER[slug].slice();
         });
         renderServices();
       }
@@ -1480,11 +1487,26 @@
       // overlap guard in book_appointment() is the source of truth either way.
       function buildTimes() {
         if (!state.dateObj) { timesWrap.innerHTML = ''; return; }
-        var dur = durOf(state.svc);
         var rb = resolveBarberFor(state.dateObj);
-        // 15-min start grid (FR-011/12, D6): starts :00/:15/:30/:45; last start =
-        // window end − occupancy. Buffer (FR-012) extends occupancy, not the
-        // visible end. Lead time (FR-013) hides slots sooner than now+leadMin.
+        // Real engine: the server returns true free start-times (the barber's
+        // actual hours − existing appointments − blocks − lead/buffer).
+        if (window.KB && KB.availableSlots) {
+          var reqDate = state.dateObj;
+          timesWrap.innerHTML = '<div class="bk-noslots" style="opacity:.5">…</div>';
+          KB.availableSlots(rb, state.svc, reqDate).then(function (arr) {
+            if (state.dateObj !== reqDate) return; // user navigated away
+            if (arr === null) { buildTimesFallback(rb); return; } // RPC failed → built-in engine
+            var mins = arr.map(function (t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3), 10); });
+            renderTimes(mins, {});
+            update();
+          });
+        } else {
+          buildTimesFallback(rb);
+        }
+      }
+      // Built-in fallback engine (15-min grid + taken_slots) for when the RPC is unavailable.
+      function buildTimesFallback(rb) {
+        var dur = durOf(state.svc);
         var occupancy = dur + (CFG.bufferMin || 0);
         var leadCut = Date.now() + CFG.leadMin * 60000;
         var y = state.dateObj.getFullYear(), mo = state.dateObj.getMonth(), da = state.dateObj.getDate();
@@ -1497,10 +1519,9 @@
         if (window.KB) {
           var reqDate = state.dateObj;
           KB.takenSlots(rb, reqDate).then(function (arr) {
-            if (state.dateObj !== reqDate) return; // user navigated away
+            if (state.dateObj !== reqDate) return;
             var set = {}; (arr || []).forEach(function (t) { set[t] = true; });
-            renderTimes(slots, set);
-            update();
+            renderTimes(slots, set); update();
           });
         }
       }

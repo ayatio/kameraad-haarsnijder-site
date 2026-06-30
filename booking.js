@@ -55,16 +55,20 @@
     },
     euro: function (cents) { return '€' + (cents % 100 === 0 ? (cents / 100) : (cents / 100).toFixed(2)); },
 
-    // Load catalogue + matrix from the DB. Resolves once KB.SERVICES is set.
+    ROSTER: {},   // { barberSlug: [day_of_week, ...] }  real working weekdays
+    BLOCKS: [],   // [{ barber: slug|null, from: Date, to: Date }]  closures/holidays
+
+    // Load catalogue + matrix + roster + closures from the DB.
     loadCatalogue: function () {
       var pServices = sb.from('services')
         .select('slug,sort_order,price_cents,duration_min,name_nl,name_en,name_fr,name_le')
         .eq('is_active', true).eq('is_walk_in', false).order('sort_order');
-      var pMatrix = sb.from('barber_services')
-        .select('barbers(slug),services(slug,is_walk_in)');
+      var pMatrix = sb.from('barber_services').select('barbers(slug),services(slug,is_walk_in)');
+      var pAvail = sb.from('availability').select('day_of_week,barbers(slug)').eq('is_active', true);
+      var pBlocks = sb.from('blocked_slots').select('start_at,end_at,barbers(slug)');
 
-      return Promise.all([pServices, pMatrix]).then(function (res) {
-        var sRes = res[0], mRes = res[1];
+      return Promise.all([pServices, pMatrix, pAvail, pBlocks]).then(function (res) {
+        var sRes = res[0], mRes = res[1], avRes = res[2], blRes = res[3];
         if (sRes.error || !sRes.data || !sRes.data.length) throw (sRes.error || new Error('no services'));
         KB.SERVICES = sRes.data.map(function (r) {
           return { slug: r.slug, order: r.sort_order, price_cents: r.price_cents, dur: r.duration_min,
@@ -76,19 +80,45 @@
           if (!b || !sv || sv.is_walk_in) return;
           (KB.MATRIX[b] = KB.MATRIX[b] || []).push(sv.slug);
         });
+        KB.ROSTER = {};
+        if (avRes.data) avRes.data.forEach(function (row) {
+          var b = row.barbers && row.barbers.slug; if (!b) return;
+          KB.ROSTER[b] = KB.ROSTER[b] || [];
+          if (KB.ROSTER[b].indexOf(row.day_of_week) < 0) KB.ROSTER[b].push(row.day_of_week);
+        });
+        KB.BLOCKS = (blRes.data || []).map(function (row) {
+          return { barber: (row.barbers && row.barbers.slug) || null, from: new Date(row.start_at), to: new Date(row.end_at) };
+        });
         return finalize();
       }).catch(function (e) {
         console.warn('[KB] catalogue fetch failed, using fallback mirror:', e);
         KB.SERVICES = FALLBACK_SERVICES.map(function (s) { return s; });
-        KB.MATRIX = {};   // empty → caller treats every barber as offering all (all-do-all provisional)
+        KB.MATRIX = {}; KB.ROSTER = {}; KB.BLOCKS = [];   // empty roster → caller keeps its built-in schedule
         return finalize();
       });
 
       function finalize() {
         KB.bySlug = {};
         KB.SERVICES.forEach(function (s) { KB.bySlug[s.slug] = s; });
-        return { services: KB.SERVICES, matrix: KB.MATRIX };
+        return { services: KB.SERVICES, matrix: KB.MATRIX, roster: KB.ROSTER };
       }
+    },
+
+    // Does this barber work on weekday `dow` (0=Sun..6=Sat)? (from real availability)
+    worksOn: function (barberSlug, dow) { var r = KB.ROSTER[(barberSlug || '').toLowerCase()]; return r ? r.indexOf(dow) >= 0 : false; },
+    // Is this barber (or everyone) closed on date `d`?
+    isBlocked: function (barberSlug, d) {
+      var t = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0).getTime();
+      var bs = (barberSlug || '').toLowerCase();
+      return KB.BLOCKS.some(function (b) { return (b.barber === null || b.barber === bs) && t >= b.from.getTime() && t <= b.to.getTime(); });
+    },
+    // Real free start-times for a barber+service+day (hours − appts − blocks − lead/buffer).
+    // Returns null on error so the caller can fall back to its built-in engine.
+    availableSlots: function (barberSlug, serviceSlug, d) {
+      var ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      return sb.rpc('available_slots', { p_barber_slug: (barberSlug || '').toLowerCase(), p_service_slug: serviceSlug, p_date: ds })
+        .then(function (r) { if (r.error) { console.warn('[KB] available_slots', r.error); return null; } return r.data || []; })
+        .catch(function (e) { console.warn('[KB] available_slots ex', e); return null; });
     },
 
     // Booked HH:MM start-times for a barber on a given day.
