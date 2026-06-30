@@ -774,12 +774,9 @@
           <div class="bk-step is-open" data-step="svc">
             <div class="bk-h"><span class="bk-n">01</span> <span data-i18n="book.s_service">Dienst</span> <span class="bk-pick" data-pick="svc"></span></div>
             <div class="bk-body">
-              <div class="bk-grid bk-services">
-                <button type="button" class="bk-opt" data-svc="Knippen" data-price="27"><span data-i18n="svc.knippen">Knippen</span><em>€27</em></button>
-                <button type="button" class="bk-opt" data-svc="Baard" data-price="18"><span data-i18n="svc.baard">Baard</span><em>€18</em></button>
-                <button type="button" class="bk-opt" data-svc="Knippen + Baard" data-price="40"><span data-i18n="svc.combo">Knippen + Baard</span><em>€40</em></button>
-                <button type="button" class="bk-opt" data-svc="Kind (–12 j.)" data-price="20"><span data-i18n="svc.kind">Kind (–12 j.)</span><em>€20</em></button>
-              </div>
+              <!-- Services are rendered from the Supabase `services` table
+                   (one source of truth) by booking.js — see renderServices(). -->
+              <div class="bk-grid bk-services"><p class="bk-note" data-i18n="book.summary_start">Kies een dienst om te beginnen.</p></div>
             </div>
           </div>
 
@@ -1182,7 +1179,8 @@
       var card = document.getElementById('bookCard');
       if (!card) return;
       var state = { svc: null, price: null, barber: null, dateObj: null, time: null };
-      var SVC_DUR = { 'Knippen': 30, 'Baard': 20, 'Knippen + Baard': 45, 'Kind (–12 j.)': 30 };
+      // Durations come from the DB catalogue (KB.svcDur); 30 is a safe default.
+      function durOf(slug) { return (window.KB && KB.svcDur) ? KB.svcDur(slug) : 30; }
       function pad(n) { return n < 10 ? '0' + n : '' + n; }
       function hashStr(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
       function resolveBarberFor(d) {
@@ -1193,10 +1191,9 @@
 
       // i18n helpers (fall back gracefully if KH is missing)
       var KH = window.KH || { t: function (k) { return k; }, list: function () { return []; }, onChange: function () {} };
-      var SVC_KEY = { 'Knippen': 'svc.knippen', 'Baard': 'svc.baard', 'Knippen + Baard': 'svc.combo', 'Kind (–12 j.)': 'svc.kind' };
       function dow() { var a = KH.list('book.dow'); return a.length ? a : ['Zo','Ma','Di','Wo','Do','Vr','Za']; }
       function mon() { var a = KH.list('book.mon'); return a.length ? a : ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec']; }
-      function svcName(c) { return SVC_KEY[c] ? KH.t(SVC_KEY[c]) : c; }
+      function svcName(slug) { return (window.KB && KB.svcName) ? KB.svcName(slug, KH.lang) : slug; }
       function barberName(id) { return id === 'any' ? KH.t('book.no_pref') : id; }
       function fmtDate(d) { return dow()[d.getDay()] + ' ' + d.getDate() + ' ' + mon()[d.getMonth()]; }
 
@@ -1220,7 +1217,7 @@
       function worksOn(b, d) { return b.works.indexOf(d.getDay()) >= 0 && !isAway(b, d); }
       // Latest valid start (15-min grid, last start = window end − occupancy).
       function lastStartMin() {
-        var occ = (SVC_DUR[state.svc] || 30) + (CFG.bufferMin || 0), last = -1;
+        var occ = durOf(state.svc) + (CFG.bufferMin || 0), last = -1;
         for (var m = 600; m + occ <= 1200; m += CFG.slotGridMin) last = m;
         return last;
       }
@@ -1243,6 +1240,31 @@
       }
       function firstAvailable() { var d = new Date(TODAY0); for (var i = 0; i <= CFG.horizonDays; i++) { if (dayAvailable(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate()); d.setDate(d.getDate() + 1); } return null; }
       function nearAway(b) { if (!b.away || !b.away.length) return null; var soon = offset(2); for (var i = 0; i < b.away.length; i++) { var r = b.away[i]; if (r.to.getTime() >= TODAY0.getTime() && r.from.getTime() <= soon.getTime()) return r; } return null; }
+
+      // ----- Catalogue (single source = Supabase `services` table) -----
+      // Render the service buttons from KB.SERVICES; localized name + price.
+      function renderServices() {
+        var wrap = card.querySelector('.bk-services');
+        if (!wrap || !window.KB || !KB.SERVICES.length) return;
+        wrap.innerHTML = '';
+        KB.SERVICES.forEach(function (s) {
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'bk-opt';
+          b.dataset.svc = s.slug; b.dataset.price = String(Math.round(s.price_cents / 100));
+          if (state.svc === s.slug) b.classList.add('is-sel');
+          b.innerHTML = '<span>' + esc(KB.svcName(s.slug, KH.lang)) + '</span><em>' + KB.euro(s.price_cents) + '</em>';
+          wrap.appendChild(b);
+        });
+      }
+      // Wire the DB matrix into the roster (empty matrix → all-do-all provisional).
+      function applyCatalogue() {
+        var allSlugs = KB.SERVICES.map(function (s) { return s.slug; });
+        BARBERS.forEach(function (bb) {
+          var m = KB.MATRIX[bb.id.toLowerCase()];
+          bb.does = (m && m.length) ? m.slice() : allSlugs.slice();
+        });
+        renderServices();
+      }
 
       var steps = {};
       card.querySelectorAll('.bk-step').forEach(function (s) { steps[s.dataset.step] = s; });
@@ -1458,7 +1480,7 @@
       // overlap guard in book_appointment() is the source of truth either way.
       function buildTimes() {
         if (!state.dateObj) { timesWrap.innerHTML = ''; return; }
-        var dur = SVC_DUR[state.svc] || 30;
+        var dur = durOf(state.svc);
         var rb = resolveBarberFor(state.dateObj);
         // 15-min start grid (FR-011/12, D6): starts :00/:15/:30/:45; last start =
         // window end − occupancy. Buffer (FR-012) extends occupancy, not the
@@ -1615,11 +1637,16 @@
 
       // Re-render dynamic strings when the language changes.
       KH.onChange(function () {
+        renderServices();
         if (state.svc) { setPick('svc', svcName(state.svc) + ' · €' + state.price); buildBarbers(state.svc); }
         if (state.barber) { setPick('barber', barberName(state.barber)); renderCal(); }
         if (state.dateObj) { setPick('date', fmtDate(state.dateObj)); buildTimes(); }
         update();
       });
+
+      // Load the canonical catalogue from Supabase (single source), then paint
+      // the service menu + wire the barber→service matrix into the roster.
+      if (window.KB && KB.loadCatalogue) { KB.loadCatalogue().then(applyCatalogue); }
     })();
   </script>
 </body>

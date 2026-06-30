@@ -18,6 +18,25 @@ customer surface: BOOK-*, consent/home cases, and the client-side slot engine.
 
 ---
 
+## Resolutions applied (2026-06-30, after your decisions)
+
+- **QA-D1 — Service catalogue → RESOLVED ("canonical 5, no kids' cut").** The site
+  now **reads the `services` table** (single source): the five canonical services
+  with DB names/prices/durations, localized per language; **"Kind" dropped**. The
+  barber→service matrix is also read from the DB. Verified end-to-end — a booking
+  persists the correct service (e.g. `haircut-beard-hotwash` €60/60min). Admin +
+  DB already matched; the site was the only outlier and is now aligned.
+- **QA-D2 — Booking order → RESOLVED ("keep service-first, update specs").** Site
+  unchanged (Service → Barber). Updated **`FUNCTIONAL-ANALYSIS.md` §4 + FR-004**
+  and **`kameraad-test-plan` BOOK-01** to Service → Barber → Slot → Details. The
+  admin's manual-booking is a separate flow (empty-slot prefill) and doesn't
+  conflict. All three now agree.
+- **QA-F1/F2/F3** (lead time, horizon, slot grid) — applied + verified (see §B).
+- **Still open:** QA-D3 (default language Leuvens vs spec NL/best-match) — minor,
+  your call. Everything below is the original audit record.
+
+---
+
 ## A · Decisions needed from you (do not guess — top of the list)
 
 | ID | Issue | Where | Breaks / conflicts | Status |
