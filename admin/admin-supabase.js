@@ -48,7 +48,7 @@
       sb.from('blocked_slots').select('id,barber_id,start_at,end_at,reason'),
       sb.from('admin_users').select('id,email,role,barber_id'),
       sb.from('settings').select('key,value'),
-      sb.from('content').select('*').eq('key', 'seasonal_banner').maybeSingle(),
+      sb.from('content').select('*').eq('key', 'banner').maybeSingle(),
     ]);
 
     // --- services ---
@@ -209,9 +209,9 @@
     async blockAdd(o, kaId) { const start = o.from + 'T00:00:00+02:00'; const end = (o.to || o.from) + 'T23:59:00+02:00'; const r = await sb.from('blocked_slots').insert({ barber_id: o.who === 'all' ? null : barbDb(o.who), start_at: start, end_at: end, reason: o.label }).select('id').single(); toast(!r.error); if (!r.error && kaId) { const b = KA.state.blocks.find((x) => x.id === kaId); if (b) b.id = r.data.id; } },
     async blockDelete(id) { const r = await sb.from('blocked_slots').delete().eq('id', id); toast(!r.error); },
     // settings
-    async settings(s) { for (const [k, key] of [['cancelWindow', 'cancellation_window_hours'], ['buffer', 'buffer_min'], ['leadTime', 'min_lead_time_hours'], ['horizon', 'booking_horizon_days'], ['interval', 'slot_increment_min'], ['rebook', 'rebooking_weeks']]) { await sb.from('settings').update({ value: s[k] }).eq('key', key); } },
+    async settings(s) { let ok = true; for (const [k, key] of [['cancelWindow', 'cancellation_window_hours'], ['buffer', 'buffer_min'], ['leadTime', 'min_lead_time_hours'], ['horizon', 'booking_horizon_days'], ['interval', 'slot_increment_min'], ['rebook', 'rebooking_weeks']]) { if (s[k] == null) continue; const r = await sb.from('settings').upsert({ key, value: s[k] }, { onConflict: 'key' }); if (r.error) ok = false; } toast(ok); },
     // banner
-    async banner(b) { const r = await sb.from('content').update({ title_nl: b.nl.title, text_nl: b.nl.text, title_en: b.en.title, text_en: b.en.text, title_fr: b.fr.title, text_fr: b.fr.text, is_active: b.active }).eq('key', 'seasonal_banner'); toast(!r.error); },
+    async banner(b) { const r = await sb.from('content').update({ title_nl: b.nl.title, text_nl: b.nl.text, title_en: b.en.title, text_en: b.en.text, title_fr: b.fr.title, text_fr: b.fr.text, is_active: b.active }).eq('key', 'banner'); toast(!r.error); },
     // admins
     async adminInvite(o, kaId) { const r = await sb.from('admin_users').insert({ email: o.email, role: o.role, barber_id: o.linked ? barbDb(o.linked) : null }).select('id').single(); toast(!r.error); if (!r.error && kaId) { const a = KA.state.admins.find((x) => x.id === kaId); if (a) a.id = r.data.id; } },
     async adminRole(id, role) { const r = await sb.from('admin_users').update({ role }).eq('id', id); toast(!r.error); },
