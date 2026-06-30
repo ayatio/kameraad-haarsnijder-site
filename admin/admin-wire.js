@@ -110,8 +110,16 @@
     $('#agLabel').onclick = () => KA.openDatePicker($('#agLabel'), KA.agenda.date, (d) => { KA.agenda.date = d; if (KA.agenda.view === 'month') KA.agenda.view = 'day'; syncViewSeg(); KA.renderAgenda(); }, { maxDate: new Date(2026, 7, 24) });
     KA.wireSeg($('#agSeg'), (i) => { KA.agenda.view = ['day', 'week', 'month'][i]; KA.renderAgenda(); });
     $('#agFilter').onclick = () => {
-      const m = KA.modal({ card: `<h2 class="serif">Toon barbier</h2><div style="display:grid;gap:6px;margin-top:10px"><button class="crosslink js-f" data-id="all"><i data-lucide="users" class="lead"></i><div class="cl-t"><b>Alle barbiers</b></div></button>${KA.barbersSorted().filter((b) => b.active).map((b) => `<button class="crosslink js-f" data-id="${b.id}"><span class="av av--txt" style="width:24px;height:24px;font-size:.6rem">${b.name[0]}</span><div class="cl-t"><b>${KA.esc(b.name)}</b></div></button>`).join('')}</div>` });
-      m.card.querySelectorAll('.js-f').forEach((btn) => (btn.onclick = () => { KA.agenda.filter = btn.dataset.id; KA.renderAgenda(); m.close(); }));
+      const active = KA.barbersSorted().filter((b) => b.active);
+      const sel = new Set(active.filter((b) => KA.agendaShows(b.id)).map((b) => b.id));
+      const row = (b) => `<label class="crosslink" style="cursor:pointer"><span class="av av--txt" style="width:24px;height:24px;font-size:.6rem">${KA.esc(b.name[0])}</span><div class="cl-t"><b>${KA.esc(b.name)}</b></div><input type="checkbox" class="ck js-fc" data-id="${b.id}" ${sel.has(b.id) ? 'checked' : ''} style="margin-left:auto"></label>`;
+      const m = KA.modal({ card: `<h2 class="serif">Toon barbier</h2><p class="muted" style="font-size:.86rem;margin:2px 0 12px">Kies één of meerdere barbiers.</p><button type="button" class="crosslink js-all" style="width:100%"><i data-lucide="users" class="lead"></i><div class="cl-t"><b>Alle barbiers</b></div></button><div style="display:grid;gap:6px;margin-top:6px">${active.map(row).join('')}</div><div class="modal__foot"><button class="b b--ghost" data-close>Annuleren</button><button class="b b--gold js-apply"><i data-lucide="check"></i> Toepassen</button></div>` });
+      m.card.querySelector('.js-all').onclick = () => { KA.agenda.filter = 'all'; KA.renderAgenda(); m.close(); };
+      m.card.querySelector('.js-apply').onclick = () => {
+        const ids = Array.from(m.card.querySelectorAll('.js-fc:checked')).map((c) => c.dataset.id);
+        KA.agenda.filter = (ids.length === 0 || ids.length >= active.length) ? 'all' : ids;
+        KA.renderAgenda(); m.close();
+      };
       ic();
     };
     $('#agAdd').onclick = () => newAppt(null, null);
@@ -124,7 +132,7 @@
       <div class="field"><label class="lbl">Klant</label><input class="in" id="naCust" placeholder="Naam of telefoon" list="custList"><datalist id="custList">${KA.state.customers.map((c) => `<option value="${KA.esc(c.name)}">`).join('')}</datalist></div>
       <div class="field"><label class="lbl">Dienst</label><select class="in" id="naSvc">${KA.activeServices().map((s) => `<option value="${s.id}">${KA.esc(s.name)} · ${s.dur}min · €${s.price}</option>`).join('')}</select></div>
       <div class="row2"><div class="field"><label class="lbl">Barbier</label><select class="in" id="naBarber">${KA.barbersSorted().filter((b) => b.active).map((b) => `<option value="${b.id}" ${b.id === barberId ? 'selected' : ''}>${KA.esc(b.name)}</option>`).join('')}</select></div>
-      <div class="field"><label class="lbl">Starttijd</label><input class="in" id="naTime" type="time" value="${startMin != null ? KA.fromMin(startMin) : '10:00'}"></div></div>
+      <div class="field"><label class="lbl">Starttijd</label><input class="in" id="naTime" type="time" step="1800" value="${startMin != null ? KA.fromMin(startMin) : '10:00'}"></div></div>
       <div class="modal__foot"><button class="b b--ghost grow" id="naWalkin" type="button"><i data-lucide="footprints"></i> Walk-in nu</button><button class="b b--ghost" data-close>Annuleren</button><button class="b b--gold js-ok"><i data-lucide="check"></i> Boek</button></div>` });
     const make = (walkin) => {
       const name = m.card.querySelector('#naCust').value.trim() || (walkin ? 'Walk-in' : '');

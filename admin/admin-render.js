@@ -29,7 +29,20 @@
   };
 
   /* ---------- AGENDA ---------- */
+  // filter: 'all' | <barberId> (single, legacy) | [<barberId>, ...] (subset)
   KA.agenda = { date: new Date(2026, 5, 30), view: 'day', filter: 'all' };
+  KA.agendaShows = function (id) { const f = KA.agenda.filter; if (f === 'all') return true; if (Array.isArray(f)) return f.includes(id); return f === id; };
+  KA.agendaFilterLabel = function () {
+    const f = KA.agenda.filter;
+    const active = KA.barbersSorted().filter((b) => b.active);
+    if (f === 'all') return 'Alle barbiers';
+    if (Array.isArray(f)) {
+      if (f.length === 0 || f.length >= active.length) return 'Alle barbiers';
+      if (f.length === 1) { const b = KA.barber(f[0]); return b ? b.name : '1 barbier'; }
+      return f.length + ' barbiers';
+    }
+    const b = KA.barber(f); return b ? b.name : 'Alle barbiers';
+  };
 
   function freeBands(barberId, date) {
     const b = KA.barber(barberId);
@@ -49,8 +62,8 @@
 
   function dayGrid() {
     const date = KA.agenda.date;
-    let cols = KA.barbersSorted().filter((b) => b.active);
-    if (KA.agenda.filter !== 'all') cols = cols.filter((b) => b.id === KA.agenda.filter);
+    let cols = KA.barbersSorted().filter((b) => b.active && KA.agendaShows(b.id));
+    if (!cols.length) cols = KA.barbersSorted().filter((b) => b.active);
     const open = KA.agendaOpenMin, pph = KA.pxPerHour;
     const posY = (min) => ((min - open) / 60) * pph;
     const rail = [];
@@ -97,8 +110,7 @@
     days.forEach((d) => {
       head += `<div class="wcol" data-day="${d.toISOString().slice(0, 10)}">`;
       if (d.toDateString() === KA.today.toDateString()) {
-        let appts = KA.state.appts.filter((a) => a.status !== 'cancelled');
-        if (KA.agenda.filter !== 'all') appts = appts.filter((a) => a.barber === KA.agenda.filter);
+        let appts = KA.state.appts.filter((a) => a.status !== 'cancelled' && KA.agendaShows(a.barber));
         appts.forEach((a) => { const sv = KA.service(a.sv); const txt = (sv.color === '#E8B84B' || sv.color === '#C9A24B') ? '#3a2a06' : '#fff';
           head += `<div class="ev" data-appt="${a.id}" style="top:${posY(KA.toMin(a.start))}px;height:${Math.max((a.dur / 60) * pph, 26)}px;background:${sv.color};color:${txt}"><b>${esc(KA.apptCustName(a))}</b></div>`; });
       }
@@ -130,7 +142,7 @@
     mount.innerHTML = v === 'week' ? weekGrid() : v === 'month' ? monthGrid() : dayGrid();
     const lbl = document.getElementById('agLabel'); if (lbl) lbl.textContent = KA.dateLabel(KA.agenda.date, v);
     const fb = document.getElementById('agFilterLabel');
-    if (fb) fb.textContent = KA.agenda.filter === 'all' ? 'Alle barbiers' : KA.barber(KA.agenda.filter).name;
+    if (fb) fb.textContent = KA.agendaFilterLabel();
     ic();
   };
 

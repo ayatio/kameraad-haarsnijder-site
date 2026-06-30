@@ -152,7 +152,7 @@
 
   KA.rescheduleAppt = function (a, after) {
     const m = KA.modal({ card: `<h2 class="serif">Verzetten</h2><p class="muted" style="font-size:.88rem;margin:2px 0 14px">Kies een nieuw moment. De klant krijgt een verzet-mail.</p>
-      <div class="row2"><div class="field"><label class="lbl">Datum</label><input class="in" type="date" value="2026-06-30"></div><div class="field"><label class="lbl">Starttijd</label><input class="in" type="time" value="${a.start}"></div></div>
+      <div class="row2"><div class="field"><label class="lbl">Datum</label><input class="in" type="date" value="2026-06-30"></div><div class="field"><label class="lbl">Starttijd</label><input class="in" type="time" step="1800" value="${a.start}"></div></div>
       <label style="display:flex;gap:8px;align-items:center;font-size:.86rem;margin-top:4px"><input type="checkbox" class="ck" checked> Klant verwittigen per e-mail</label>
       <div class="modal__foot"><button class="b b--ghost" data-close>Annuleren</button><button class="b b--gold js-ok"><i data-lucide="calendar-clock"></i> Verzet</button></div>` });
     m.card.querySelector('.js-ok').onclick = () => { const t = m.card.querySelector('input[type=time]').value; const d = m.card.querySelector('input[type=date]').value || a.date; if (t) { a.start = t; a.date = d; if (KA.db) KA.db.apptReschedule(a.id, d, t, a.dur); } m.close(); KA.toast('Verzet — klant gemaild.'); refreshAll(); if (after) after(); };
