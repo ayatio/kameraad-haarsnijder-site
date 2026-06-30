@@ -18,9 +18,10 @@ two FKs from `appointments` to `barbers` (`barber_id` + `resolved_by`), so a bar
 
 ## Secrets / config
 - `RESEND_API_KEY` — currently inlined (demo). **Rotate** and move to a function secret.
-- `FROM` — `onboarding@resend.dev` until `mail.kameraadhaarsnijder.be` is verified in
-  Resend; then switch to `afspraak@mail.kameraadhaarsnijder.be`. Until verified, mail
-  only reaches the Resend account owner's address (admin@ayat.services).
+- `FROM` — `Kameraad Haarsnijder <afspraak@mail.kameraadhaarsnijder.be>` (domain
+  `mail.kameraadhaarsnijder.be` verified in Resend 2026-07-01; all three functions
+  send from it and now reach any recipient). The apex `kameraadhaarsnijder.be` is
+  **not** verified — use the `mail.` subdomain sender.
 
 ## Cron
 `eod-reminder-daily` (schema `cron.job`) posts to the `eod-reminder` function via
