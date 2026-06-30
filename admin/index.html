@@ -1,245 +1,251 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta name="robots" content="noindex,nofollow" />
 <meta charset="UTF-8" />
+<meta name="robots" content="noindex,nofollow" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Kameraad — Beheer</title>
 <link rel="stylesheet" href="colors_and_type.css" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Oswald:wght@300;400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="admin.css" />
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body)}
+  .wrap{width:min(1100px,94vw);margin-inline:auto}
+  .label{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.18em;font-size:.7rem;color:var(--gold-deep)}
+
+  /* ---------- login ---------- */
+  .login{min-height:100vh;display:grid;place-items:center;background:var(--ink)}
+  .login__card{width:min(380px,92vw);background:var(--paper);border-radius:10px;padding:34px 30px;box-shadow:0 24px 70px rgba(0,0,0,.4)}
+  .login__logo{display:block;height:30px;margin:0 auto 6px}
+  .login h1{font-family:var(--font-serif);font-weight:500;font-size:1.5rem;text-align:center;margin:.2em 0 .1em}
+  .login p{text-align:center;color:var(--smoke);font-size:.86rem;margin:0 0 22px}
+  .fld{margin:0 0 14px}
+  .fld label{display:block;font-size:.74rem;letter-spacing:.04em;color:var(--fg2);margin:0 0 5px;text-transform:uppercase;font-family:var(--font-display)}
+  .fld input{width:100%;padding:11px 12px;border:1px solid var(--line-on-paper);border-radius:6px;font-size:1rem;background:var(--white)}
+  .fld input:focus{outline:none;border-color:var(--gold)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:6px;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;padding:12px 18px;background:var(--gold);color:var(--ink);width:100%;transition:background .15s}
+  .btn:hover{background:var(--gold-bright)}
+  .btn:disabled{opacity:.55;cursor:default}
+  .err{color:#b3261e;background:rgba(206,75,51,.08);border:1px solid rgba(206,75,51,.3);border-radius:6px;padding:9px 11px;font-size:.85rem;margin:0 0 14px;display:none}
+
+  /* ---------- app ---------- */
+  .top{background:var(--ink);color:var(--paper);padding:14px 0}
+  .top .wrap{display:flex;align-items:center;gap:14px}
+  .top img{height:24px}
+  .top .who{margin-left:auto;font-size:.85rem;color:var(--gold-pale)}
+  .top .btn-ghost{background:none;border:1px solid var(--line-on-ink);color:var(--paper);width:auto;padding:8px 14px}
+  .top .btn-ghost:hover{background:rgba(255,255,255,.08)}
+  main{padding:26px 0 60px}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0 0 26px}
+  .kpi{background:var(--white);border:1px solid var(--line-on-paper);border-radius:8px;padding:16px 18px}
+  .kpi .n{font-family:var(--font-serif);font-size:2rem;line-height:1;margin:.15em 0 0}
+  .sec{margin:0 0 28px}
+  .sec h2{font-family:var(--font-serif);font-weight:500;font-size:1.3rem;margin:0 0 4px}
+  .sec .sub{color:var(--smoke);font-size:.84rem;margin:0 0 12px}
+  table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--line-on-paper);border-radius:8px;overflow:hidden}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line-on-paper);font-size:.9rem;vertical-align:middle}
+  th{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.08em;font-size:.66rem;color:var(--smoke);background:var(--paper-2)}
+  tr:last-child td{border-bottom:none}
+  .cust{font-weight:600}
+  .meta{color:var(--smoke);font-size:.8rem}
+  .pill{display:inline-block;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.06em;font-size:.6rem;padding:4px 9px;border-radius:999px}
+  .pill.ok{background:rgba(63,147,80,.14);color:#2c6e3c}
+  .pill.done{background:rgba(201,162,75,.18);color:var(--gold-deep)}
+  .pill.cancel{background:rgba(206,75,51,.12);color:#b3261e}
+  .pill.noshow{background:rgba(138,133,123,.18);color:#6c675e}
+  .act{display:inline-flex;gap:6px}
+  .act button{border:1px solid var(--line-on-paper);background:var(--white);border-radius:5px;padding:5px 9px;font-size:.74rem;cursor:pointer;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.05em}
+  .act button.done{border-color:var(--gold);color:var(--gold-deep)}
+  .act button.cancel{border-color:rgba(206,75,51,.4);color:#b3261e}
+  .act button:hover{background:var(--paper-2)}
+  .empty{padding:18px;color:var(--smoke);font-size:.9rem;text-align:center;background:var(--white);border:1px dashed var(--line-on-paper);border-radius:8px}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:8px;font-size:.88rem;box-shadow:0 12px 30px rgba(0,0,0,.3);opacity:0;pointer-events:none;transition:opacity .2s}
+  .toast.show{opacity:1}
+  @media(max-width:680px){.kpis{grid-template-columns:1fr 1fr}.hide-sm{display:none}}
+</style>
 </head>
 <body>
 
-  <!-- ============================ LOGIN ============================ -->
-  <div class="login" id="login" hidden>
-    <form class="login__card" id="loginForm">
-      <img class="login__logo" src="assets/logo-gold.png" alt="Kameraad Haarsnijder" />
-      <h1 class="serif">Beheer</h1>
-      <p class="sub">Meld je aan om de zaak te beheren.</p>
-      <div class="err" id="loginErr" hidden>Te veel pogingen. Probeer opnieuw over 15 minuten.</div>
-      <div class="field"><label class="lbl">E-mailadres</label><input class="in" type="email" value="avraz@kameraadhaarsnijder.be" /></div>
-      <div class="field"><label class="lbl">Wachtwoord</label><input class="in" type="password" value="kameraad" /></div>
-      <button class="b b--gold" type="submit" style="width:100%;justify-content:center;padding:13px">Aanmelden</button>
-      <a class="forgot" href="#" id="toForgot">Wachtwoord vergeten?</a>
-    </form>
-  </div>
+<!-- LOGIN -->
+<section class="login" id="loginView">
+  <form class="login__card" id="loginForm">
+    <img class="login__logo" src="assets/logo-gold.png" alt="Kameraad" />
+    <h1>Beheer</h1>
+    <p>Log in om je afspraken te beheren</p>
+    <div class="err" id="loginErr"></div>
+    <div class="fld"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required /></div>
+    <div class="fld"><label for="pwd">Wachtwoord</label><input id="pwd" type="password" autocomplete="current-password" required /></div>
+    <button class="btn" id="loginBtn" type="submit">Aanmelden</button>
+  </form>
+</section>
 
-  <!-- ============================ APP ============================ -->
-  <div class="admin" id="app" hidden>
-    <aside class="sb" id="sb">
-      <div class="sb__logo"><img src="assets/logo-gold.png" alt="" /><span><b>Kameraad</b><small>Beheer</small></span></div>
-      <nav>
-        <div class="sb__grp">Beheer</div>
-        <a data-route="vandaag" href="#vandaag" class="on"><i data-lucide="layout-dashboard"></i> Vandaag</a>
-        <a data-route="agenda" href="#agenda"><i data-lucide="calendar-days"></i> Agenda</a>
-        <a data-route="beschikbaarheid" href="#beschikbaarheid"><i data-lucide="clock"></i> Beschikbaarheid</a>
-        <a data-route="klanten" href="#klanten"><i data-lucide="users"></i> Klanten</a>
-        <a data-route="statistieken" href="#statistieken"><i data-lucide="bar-chart-3"></i> Statistieken</a>
-        <div class="sb__grp" data-owner-only>Configuratie</div>
-        <a data-route="barbiers" href="#barbiers"><i data-lucide="scissors"></i> Barbiers</a>
-        <a data-route="diensten" href="#diensten" data-owner-only><i data-lucide="list"></i> Diensten</a>
-        <a data-route="instellingen" href="#instellingen" data-owner-only><i data-lucide="settings"></i> Instellingen</a>
-        <a data-route="banner" href="#banner" data-owner-only><i data-lucide="megaphone"></i> Banner</a>
-        <a data-route="mailing" href="#mailing" data-owner-only><i data-lucide="mail"></i> Bulk e-mail</a>
-        <a data-route="beheerders" href="#beheerders" data-owner-only><i data-lucide="shield"></i> Beheerders</a>
-      </nav>
-      <div class="sb__user">
-        <div class="sb__avatar">A</div>
-        <div><div class="nm">Avraz</div><div class="rl">Eigenaar</div></div>
-        <button id="logout" title="Afmelden" aria-label="Afmelden"><i data-lucide="log-out"></i></button>
-      </div>
-    </aside>
-
-    <div class="main">
-      <header class="topbar">
-        <button class="burger" aria-label="Menu"><i data-lucide="menu"></i></button>
-        <div><h1 id="pageTitle">Vandaag</h1></div>
-        <div class="topbar__r">
-          <div class="search"><i data-lucide="search"></i><input id="globalSearch" placeholder="Zoek klant of afspraak…" /></div>
-          <div class="rbac" title="Demo: wissel tussen rollen">
-            <span class="rolehint">Weergave</span>
-            <div class="seg" id="roleSeg"><button class="on" data-v="owner">Eigenaar</button><button data-v="barber">Barbier</button></div>
-          </div>
-        </div>
-      </header>
-
-      <div class="content">
-
-        <!-- ===== VANDAAG ===== -->
-        <section class="view on" id="v-vandaag">
-          <p class="muted" style="margin:0 0 18px">Dinsdag 30 juni 2026 · alles in één oogopslag.</p>
-          <div class="kpis">
-            <div class="kpi" data-kpi="today" style="cursor:pointer"><div class="l"><i data-lucide="calendar-check"></i> Afspraken vandaag</div><div class="n">8</div><div class="d" id="kpiTodo">2 nog te gaan</div></div>
-            <div class="kpi"><div class="l"><i data-lucide="activity"></i> Bezetting vandaag</div><div class="n">72%</div><div class="d">over 4 barbiers</div></div>
-            <div class="kpi" data-kpi="noshow" style="cursor:pointer"><div class="l"><i data-lucide="user-x"></i> No-shows deze maand</div><div class="n">3</div><div class="d">van 142 afspraken</div></div>
-            <div class="kpi" data-kpi="revenue" style="cursor:pointer"><div class="l"><i data-lucide="euro"></i> Omzet deze week</div><div class="n">€1.240</div><div class="d">enkel voltooid</div></div>
-          </div>
-          <div class="panel">
-            <div class="panel__h"><h2>Vandaag</h2><div class="r"><span class="muted" style="font-size:.82rem" id="vandaagCount">8 afspraken</span><button class="b b--ghost b--sm" id="printDagBtn"><i data-lucide="printer"></i> Print dagbladen</button><button class="b b--ghost b--sm" id="openAgendaBtn"><i data-lucide="calendar"></i> Open agenda</button></div></div>
-            <div class="panel__b flush">
-              <table class="t collapse"><thead><tr><th>Tijd</th><th>Klant</th><th>Dienst</th><th>Barbier</th><th>Status</th></tr></thead><tbody id="vandaagRows"></tbody></table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== AGENDA ===== -->
-        <section class="view" id="v-agenda">
-          <div class="ag-tools">
-            <div class="ag-nav"><button id="agPrev" aria-label="Vorige"><i data-lucide="chevron-left"></i></button><span class="d" id="agLabel" role="button" tabindex="0" style="cursor:pointer">Di 30 juni 2026</span><button id="agNext" aria-label="Volgende"><i data-lucide="chevron-right"></i></button></div>
-            <button class="b b--ghost b--sm" id="agToday">Vandaag</button>
-            <div class="seg" id="agSeg"><button class="on">Dag</button><button>Week</button><button>Maand</button></div>
-            <button class="b b--ghost b--sm" id="agFilter" style="margin-left:auto"><i data-lucide="users"></i> <span id="agFilterLabel">Alle barbiers</span></button>
-            <button class="b b--ghost b--sm" id="agPrint"><i data-lucide="printer"></i> Print</button>
-            <button class="b b--gold b--sm" id="agAdd"><i data-lucide="plus"></i> Afspraak</button>
-          </div>
-          <div id="agGrid"></div>
-          <p class="hint" style="margin-top:10px"><i data-lucide="info" style="width:13px;height:13px;vertical-align:-2px"></i> Lege tijd toont als <b>Vrij</b> — klik om te boeken. Slepen om te verzetten komt in v2; gebruik tot dan <b>Verzet</b> in een afspraak.</p>
-        </section>
-
-        <!-- ===== BESCHIKBAARHEID ===== -->
-        <section class="view" id="v-beschikbaarheid">
-          <div class="ag-tools">
-            <div class="seg" id="beschSeg"><button data-v="all">Alle</button><button class="on" data-v="b-avraz">Avraz</button><button data-v="b-adil">Adil</button><button data-v="b-simar">Simar</button><button data-v="b-bas">Bas</button><button data-v="shop">Shop-uren</button></div>
-            <button class="b b--gold b--sm" id="blokBtn" style="margin-left:auto"><i data-lucide="plus"></i> Blokkade</button>
-          </div>
-          <div id="hoursPanel"></div>
-          <div id="blocksPanel"></div>
-        </section>
-
-        <!-- ===== KLANTEN ===== -->
-        <section class="view" id="v-klanten">
-          <div id="bulkMount"></div>
-          <div class="panel">
-            <div class="panel__h"><h2>Klanten</h2><div class="r"><div class="search" style="min-width:240px"><i data-lucide="search"></i><input id="klantSearch" placeholder="Zoek op naam, e-mail of telefoon…" /></div></div></div>
-            <div class="panel__b flush">
-              <table class="t collapse"><thead><tr><th class="ckcell" data-owner-only><input type="checkbox" class="ck" id="ckAll" /></th><th>Klant</th><th>Contact</th><th>Laatste bezoek</th><th class="num">Bezoeken</th><th class="num">No-shows</th><th>Opt-ins</th></tr></thead><tbody id="customerRows"></tbody></table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== STATISTIEKEN ===== -->
-        <section class="view" id="v-statistieken">
-          <div class="ag-tools"><div class="seg" id="statSeg"><button>Dag</button><button class="on">Week</button><button>Maand</button><button>Aangepast</button></div><span class="muted" style="font-size:.82rem" id="statRange">24 – 30 juni 2026</span></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:22px">
-            <div class="kpi"><div class="l"><i data-lucide="calendar-check"></i> Boekingen</div><div class="n">37</div></div>
-            <div class="kpi"><div class="l"><i data-lucide="circle-check-big"></i> Voltooid</div><div class="n">31</div></div>
-            <div class="kpi"><div class="l"><i data-lucide="user-x"></i> No-shows</div><div class="n">2</div></div>
-            <div class="kpi"><div class="l"><i data-lucide="euro"></i> Omzet</div><div class="n">€1.240</div><div class="d">enkel voltooid</div></div>
-            <div class="kpi" id="statSatTile" style="cursor:pointer"><div id="statSat"></div></div>
-          </div>
-          <div class="panel">
-            <div class="panel__h"><h2>Per barbier</h2><div class="r"><button class="b b--ghost b--sm" id="statExport"><i data-lucide="download"></i> Export</button></div></div>
-            <div class="panel__b flush"><table class="t collapse"><thead><tr><th>Barbier</th><th class="num">Boekingen</th><th class="num">Voltooid</th><th class="num">No-shows</th><th class="num">Omzet</th></tr></thead><tbody id="statPerBarber"></tbody></table></div>
-          </div>
-          <div class="panel">
-            <div class="panel__h"><h2>Per dienst</h2></div>
-            <div class="panel__b flush"><table class="t collapse"><thead><tr><th>Dienst</th><th class="num">Boekingen</th><th class="num">Omzet</th></tr></thead><tbody id="statPerDienst"></tbody></table></div>
-          </div>
-        </section>
-
-        <!-- ===== BARBIERS ===== -->
-        <section class="view" id="v-barbiers">
-          <div class="panel">
-            <div class="panel__h"><h2>Barbiers</h2><div class="r"><button class="b b--gold b--sm" id="addBarberBtn"><i data-lucide="plus"></i> Barbier</button></div></div>
-            <div class="panel__b flush"><table class="t collapse"><thead><tr><th></th><th>Barbier</th><th>Diensten</th><th class="num">Vandaag</th><th>Status</th><th></th></tr></thead><tbody id="barbiersRows"></tbody></table></div>
-          </div>
-        </section>
-
-        <!-- ===== DIENSTEN ===== -->
-        <section class="view" id="v-diensten">
-          <div class="panel">
-            <div class="panel__h"><h2>Diensten</h2><div class="r"><button class="b b--gold b--sm" id="addDienstBtn"><i data-lucide="plus"></i> Dienst</button></div></div>
-            <div class="panel__b flush"><table class="t collapse"><thead><tr><th>Dienst</th><th>Duur</th><th class="num">Prijs</th><th>Status</th><th></th></tr></thead><tbody id="dienstenRows"></tbody></table></div>
-          </div>
-          <div class="panel" id="matrixPanel">
-            <div class="panel__h"><h2>Wie biedt wat aan</h2><div class="r"><span class="muted" style="font-size:.82rem">Tik een cel om te wisselen</span></div></div>
-            <div class="panel__b flush"><table class="t"><thead id="matrixHead"></thead><tbody id="matrixRows"></tbody></table></div>
-          </div>
-        </section>
-
-        <!-- ===== INSTELLINGEN ===== -->
-        <section class="view" id="v-instellingen">
-          <div class="panel" style="max-width:760px">
-            <div class="panel__h"><h2>Planning</h2><div class="r"><span class="muted" style="font-size:.82rem">Wijzigingen gelden voor nieuwe boekingen</span></div></div>
-            <div class="panel__b" id="settingsForm">
-              <div class="grid-2">
-                <div class="field"><label class="lbl">Annulerings­venster (uur)</label><input class="in" id="setCancel" type="number" min="1" max="72" value="24" /><div class="hint">1–72 u · hoe laat een klant nog mag annuleren of verzetten.</div></div>
-                <div class="field"><label class="lbl">Buffer na afspraak (min)</label><input class="in" id="setBuffer" type="number" min="0" max="60" step="5" value="0" /><div class="hint">0–60 min · pauze na elke afspraak (verlengt bezetting, niet de zichtbare eindtijd).</div></div>
-                <div class="field"><label class="lbl">Minimale voorsprong (uur)</label><input class="in" id="setLead" type="number" min="0" max="72" value="2" /><div class="hint">0–72 u · hoe snel voor nu nog boekbaar.</div></div>
-                <div class="field"><label class="lbl">Boekingshorizon (dagen)</label><input class="in" id="setHorizon" type="number" min="7" max="120" value="56" /><div class="hint">7–120 dagen · hoe ver vooruit de kalender opent.</div></div>
-                <div class="field"><label class="lbl">Starttijd-interval</label><select class="in" id="setInterval"><option>5</option><option>10</option><option selected>15</option><option>20</option><option>30</option></select><div class="hint">min · raster van starttijden.</div></div>
-                <div class="field"><label class="lbl">Herboekings-nudge (weken)</label><input class="in" id="setRebook" type="number" min="1" max="26" value="5" /><div class="hint">1–26 weken · wanneer de "tijd voor een trim"-mail vertrekt.</div></div>
-              </div>
-              <div class="savebar"><span class="dirty js-dirty"><span class="dot"></span> Niet-opgeslagen wijzigingen</span><button class="b b--gold js-save" disabled><i data-lucide="check"></i> Opslaan</button><button class="b b--ghost js-cancel">Annuleren</button></div>
-              <p class="hint" style="margin-top:6px">Openingsuren van de zaak &amp; de "gesloten"-labels staan onder <a href="#beschikbaarheid" class="gold">Beschikbaarheid → Shop-uren</a>.</p>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== BANNER ===== -->
-        <section class="view" id="v-banner">
-          <div class="panel" style="max-width:720px">
-            <div class="panel__h"><h2>Seizoensbanner</h2><div class="r" id="bnrStatus"></div></div>
-            <div class="panel__b" id="bannerForm">
-              <div class="toggle-row" style="border:none;padding-top:0"><span class="tt"><b>Banner actief</b><small>Verschijnt boven de hero — live binnen 60 s</small></span><span id="bnrActive"></span></div>
-              <div class="seg" id="bnrLocale" style="margin:6px 0 16px"><button class="on">NL</button><button>EN</button><button>FR</button></div>
-              <div class="field"><label class="lbl">Titel <span class="muted" style="text-transform:none;letter-spacing:0">(NL verplicht)</span></label><input class="in" id="bnrTitle" /></div>
-              <div class="field"><label class="lbl">Tekst</label><textarea class="in" id="bnrText" rows="2"></textarea></div>
-              <label class="lbl">Voorbeeld op de site</label>
-              <div class="bnr-preview" id="bnrPreview"><div class="strip"></div><div class="fakehero">Homepage hero</div></div>
-              <div style="display:flex;gap:8px;margin-top:14px"><button class="b b--gold" id="bnrSave"><i data-lucide="check"></i> Opslaan</button></div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== MAILING ===== -->
-        <section class="view" id="v-mailing">
-          <div class="panel" style="max-width:720px">
-            <div class="panel__h"><h2>Bulk e-mail</h2></div>
-            <div class="panel__b" id="mailForm">
-              <div class="field"><label class="lbl">Ontvangers</label><div class="seg" id="mailRecip"><button class="on">Marketing opt-in · 84</button><button>Alle klanten · 312</button></div><div class="hint">Marketing gaat enkel naar wie expliciet opt-in gaf — de filter is verplicht en niet uit te zetten.</div></div>
-              <div class="seg" id="mailLocale" style="margin-bottom:16px"><button class="on">NL</button><button>EN</button><button>FR</button></div>
-              <div class="field"><label class="lbl">Onderwerp</label><input class="in" id="mailSubject" value="Een vinger whiskey en een verse coupe?" /></div>
-              <div class="field"><label class="lbl">Bericht</label><textarea class="in" id="mailBody" rows="5">Beste kameraad,
-
-De zomer komt eraan — tijd voor een frisse coupe. Boek je stoel en geniet van een jatteke kaffe van het huis.
-
-Tot snel,
-Kameraad Haarsnijder</textarea></div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="b b--ghost" id="mailTest"><i data-lucide="send"></i> Test naar mezelf</button><button class="b b--ghost" id="mailPreview"><i data-lucide="eye"></i> Voorbeeld</button><button class="b b--gold" id="mailSend"><i data-lucide="send"></i> <span id="mailSendCount">Verstuur naar 84</span></button></div>
-            </div>
-          </div>
-        </section>
-
-        <!-- ===== BEHEERDERS ===== -->
-        <section class="view" id="v-beheerders">
-          <div class="panel">
-            <div class="panel__h"><h2>Beheerders</h2><div class="r"><button class="b b--gold b--sm" id="inviteBtn"><i data-lucide="user-plus"></i> Uitnodigen</button></div></div>
-            <div class="panel__b flush"><table class="t collapse"><thead><tr><th>Naam</th><th>E-mail</th><th>Rol</th><th>Gekoppeld</th><th>Laatste login</th><th>Status</th><th></th></tr></thead><tbody id="beheerdersRows"></tbody></table></div>
-          </div>
-        </section>
-
-      </div>
+<!-- APP -->
+<div id="appView" hidden>
+  <header class="top">
+    <div class="wrap">
+      <img src="assets/logo-gold.png" alt="Kameraad" />
+      <span class="label" style="color:var(--gold-pale)">Beheer</span>
+      <span class="who" id="who"></span>
+      <button class="btn btn-ghost" id="logoutBtn" style="margin-left:14px">Afmelden</button>
     </div>
-  </div>
-
-  <!-- generic drawer (P-02 / P-03) -->
-  <div class="drawer" id="drawer">
-    <div class="drawer__scrim" data-close></div>
-    <div class="drawer__panel">
-      <button class="drawer__close" data-close aria-label="Sluiten"><i data-lucide="x"></i></button>
-      <div id="drawerBody"></div>
+  </header>
+  <main class="wrap">
+    <div class="kpis">
+      <div class="kpi"><span class="label">Vandaag</span><div class="n" id="kToday">–</div></div>
+      <div class="kpi"><span class="label">Binnenkort</span><div class="n" id="kUpcoming">–</div></div>
+      <div class="kpi"><span class="label">Klanten</span><div class="n" id="kCust">–</div></div>
     </div>
-  </div>
 
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="admin-data.js"></script>
-  <script src="admin-kit.js"></script>
-  <script src="admin-render.js"></script>
-  <script src="admin-editors.js"></script>
-  <script src="admin-wire.js"></script>
+    <section class="sec">
+      <h2>Vandaag</h2>
+      <div class="sub" id="todayDate"></div>
+      <div id="todayWrap"></div>
+    </section>
+
+    <section class="sec">
+      <h2>Binnenkort</h2>
+      <div class="sub">Aankomende bevestigde afspraken</div>
+      <div id="upWrap"></div>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  var SUPABASE_URL = 'https://hzvhyslujvkwqpkevahj.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_s7EpcEpv2hdZiNgufSWLlQ_xsGOifv_';
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  var TZ = 'Europe/Brussels';
+
+  var loginView = document.getElementById('loginView');
+  var appView = document.getElementById('appView');
+  var loginForm = document.getElementById('loginForm');
+  var loginErr = document.getElementById('loginErr');
+  var loginBtn = document.getElementById('loginBtn');
+
+  function showToast(msg) {
+    var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2600);
+  }
+  function localDate(iso) { return new Date(iso).toLocaleDateString('nl-BE', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' }); }
+  function localTime(iso) { return new Date(iso).toLocaleTimeString('nl-BE', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }); }
+  function dayKey(iso) { return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ }); } // YYYY-MM-DD
+  function euro(c) { return '€' + (c % 100 === 0 ? c / 100 : (c / 100).toFixed(2)); }
+  function esc(s) { return (s || '').replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  var STATUS = {
+    confirmed: { label: 'Bevestigd', cls: 'ok' },
+    completed: { label: 'Voltooid', cls: 'done' },
+    cancelled: { label: 'Geannuleerd', cls: 'cancel' },
+    no_show:   { label: 'No-show', cls: 'noshow' },
+    pending:   { label: 'In afwachting', cls: 'ok' }
+  };
+
+  // ---------- auth ----------
+  loginForm.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    loginErr.style.display = 'none';
+    loginBtn.disabled = true; var lbl = loginBtn.textContent; loginBtn.textContent = '…';
+    var email = document.getElementById('email').value.trim();
+    var password = document.getElementById('pwd').value;
+    var r = await sb.auth.signInWithPassword({ email: email, password: password });
+    loginBtn.disabled = false; loginBtn.textContent = lbl;
+    if (r.error) { loginErr.textContent = 'Aanmelden mislukt — controleer e-mail en wachtwoord.'; loginErr.style.display = 'block'; return; }
+    enterApp(r.data.session);
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async function () {
+    await sb.auth.signOut(); location.reload();
+  });
+
+  function enterApp(session) {
+    loginView.style.display = 'none';
+    appView.hidden = false;
+    var meta = (session && session.user && session.user.user_metadata) || {};
+    document.getElementById('who').textContent = (meta.name ? meta.name + ' · ' : '') + (session.user.email);
+    loadData();
+  }
+
+  // ---------- data ----------
+  async function loadData() {
+    var r = await sb.from('appointments')
+      .select('id,start_at,end_at,status,customer_notes,customers(first_name,last_name,email,phone),services(name_nl,price_cents),barbers(name)')
+      .order('start_at');
+    if (r.error) { showToast('Kon afspraken niet laden'); console.warn(r.error); return; }
+    var rows = r.data || [];
+    var todayKey = new Date().toLocaleDateString('en-CA', { timeZone: TZ });
+    var nowMs = Date.now();
+    var today = [], up = [];
+    rows.forEach(function (a) {
+      var k = dayKey(a.start_at);
+      if (k === todayKey) today.push(a);
+      else if (new Date(a.start_at).getTime() >= nowMs) up.push(a);
+    });
+    document.getElementById('todayDate').textContent =
+      new Date().toLocaleDateString('nl-BE', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    document.getElementById('kToday').textContent = today.length;
+    document.getElementById('kUpcoming').textContent = up.length;
+
+    // distinct customers (across all loaded appts)
+    var emails = {}; rows.forEach(function (a) { if (a.customers && a.customers.email) emails[a.customers.email] = 1; });
+    document.getElementById('kCust').textContent = Object.keys(emails).length;
+
+    document.getElementById('todayWrap').innerHTML = renderTable(today, true);
+    document.getElementById('upWrap').innerHTML = renderTable(up, false);
+    wireActions();
+  }
+
+  function renderTable(list, isToday) {
+    if (!list.length) return '<div class="empty">' + (isToday ? 'Geen afspraken vandaag.' : 'Nog geen aankomende afspraken.') + '</div>';
+    var head = '<table><thead><tr><th>Tijd</th>' + (isToday ? '' : '<th>Datum</th>') +
+      '<th>Klant</th><th class="hide-sm">Telefoon</th><th>Dienst</th><th>Barbier</th><th>Status</th><th></th></tr></thead><tbody>';
+    var body = list.map(function (a) {
+      var c = a.customers || {}, s = a.services || {}, b = a.barbers || {};
+      var st = STATUS[a.status] || { label: a.status, cls: 'ok' };
+      var name = esc(((c.first_name || '') + ' ' + (c.last_name || '')).trim() || c.email || '—');
+      var actions = a.status === 'confirmed'
+        ? '<div class="act"><button class="done" data-act="complete" data-id="' + a.id + '">Voltooid</button>' +
+          '<button class="cancel" data-act="cancel" data-id="' + a.id + '">Annuleer</button></div>'
+        : '';
+      return '<tr>' +
+        '<td>' + localTime(a.start_at) + '</td>' +
+        (isToday ? '' : '<td>' + localDate(a.start_at) + '</td>') +
+        '<td><span class="cust">' + name + '</span>' + (a.customer_notes ? '<div class="meta">📝 ' + esc(a.customer_notes) + '</div>' : '') + '</td>' +
+        '<td class="hide-sm meta">' + esc(c.phone || '') + '</td>' +
+        '<td>' + esc(s.name_nl || '') + '<div class="meta">' + (s.price_cents != null ? euro(s.price_cents) : '') + '</div></td>' +
+        '<td>' + esc(b.name || '') + '</td>' +
+        '<td><span class="pill ' + st.cls + '">' + st.label + '</span></td>' +
+        '<td>' + actions + '</td>' +
+        '</tr>';
+    }).join('');
+    return head + body + '</tbody></table>';
+  }
+
+  function wireActions() {
+    document.querySelectorAll('[data-act]').forEach(function (btn) {
+      btn.addEventListener('click', async function () {
+        var id = btn.getAttribute('data-id'), act = btn.getAttribute('data-act');
+        if (act === 'cancel' && !confirm('Deze afspraak annuleren? De klant houdt het tijdslot vrij.')) return;
+        btn.disabled = true;
+        var patch = act === 'complete'
+          ? { status: 'completed' }
+          : { status: 'cancelled', cancelled_at: new Date().toISOString() };
+        var r = await sb.from('appointments').update(patch).eq('id', id);
+        if (r.error) { showToast('Mislukt — probeer opnieuw'); btn.disabled = false; console.warn(r.error); return; }
+        showToast(act === 'complete' ? 'Gemarkeerd als voltooid' : 'Afspraak geannuleerd');
+        loadData();
+      });
+    });
+  }
+
+  // ---------- boot ----------
+  (async function () {
+    var r = await sb.auth.getSession();
+    if (r.data && r.data.session) enterApp(r.data.session);
+  })();
+})();
+</script>
 </body>
 </html>
