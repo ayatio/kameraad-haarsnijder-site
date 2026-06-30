@@ -107,6 +107,13 @@
         p_start: p.start,            // ISO 8601 string (UTC)
         p_first: p.first, p_last: p.last, p_email: p.email,
         p_phone: p.phone, p_note: p.note || null, p_lang: p.lang || 'nl'
+      }).then(function (res) {
+        // Fire-and-forget the confirmation email; never block/break the booking.
+        if (res && !res.error && res.data) {
+          try { sb.functions.invoke('send-confirmation', { body: { appointment_id: res.data } }).catch(function () {}); }
+          catch (e) {}
+        }
+        return res;
       });
     }
   };
