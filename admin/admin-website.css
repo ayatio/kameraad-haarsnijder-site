@@ -1,0 +1,114 @@
+/* ============================================================
+   Kameraad Admin — Website editor (CMS)
+   The "Website" section: edit the public homepage's content,
+   stage as a draft, preview live, publish. Composes with
+   admin.css tokens (--ink, --gold, --paper, --line-on-paper…).
+   ============================================================ */
+
+.wsite { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 400px); gap: 22px; align-items: start; }
+
+/* ---- publish bar ---- */
+.wpub { position: sticky; top: 8px; z-index: 6; display: flex; align-items: center; gap: 14px;
+  background: var(--white); border: 1px solid var(--line-on-paper); border-radius: var(--r-md);
+  padding: 12px 16px; box-shadow: var(--shadow-1, 0 1px 2px rgba(22,20,15,.05)); margin-bottom: 18px; }
+.wpub__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--stone); flex: none; }
+.wpub.is-dirty .wpub__dot { background: var(--gold); box-shadow: 0 0 0 4px rgba(201,162,75,.18); }
+.wpub__txt { display: flex; flex-direction: column; line-height: 1.25; }
+.wpub__txt b { font-size: .92rem; }
+.wpub__txt small { font-size: .76rem; color: var(--smoke); }
+.wpub__sp { margin-left: auto; }
+.wpub__actions { display: flex; gap: 8px; }
+
+/* ---- sub-tabs ---- */
+.wtabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-bottom: 14px;
+  border-bottom: 1px solid var(--line-on-paper); padding-bottom: 0; }
+.wtabs::-webkit-scrollbar { height: 0; }
+.wtab { flex: none; appearance: none; background: none; border: 0; cursor: pointer;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: .76rem;
+  color: var(--smoke); padding: 9px 12px 11px; border-bottom: 2px solid transparent; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 7px; }
+.wtab i { width: 15px; height: 15px; }
+.wtab:hover { color: var(--ink); }
+.wtab.on { color: var(--ink); border-bottom-color: var(--gold); }
+
+/* ---- language switch ---- */
+.wlang { display: flex; align-items: center; gap: 9px; margin-bottom: 16px; }
+.wlang__lbl { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: .66rem; color: var(--smoke); }
+.wlang .seg { flex-wrap: wrap; }
+.wlang .seg button { padding: 5px 11px; }
+
+/* ---- editor panel ---- */
+.wpanel { display: flex; flex-direction: column; gap: 16px; }
+.wcard { background: var(--white); border: 1px solid var(--line-on-paper); border-radius: var(--r-md); padding: 16px 17px; }
+.wcard__h { display: flex; align-items: center; gap: 10px; margin: 0 0 13px; }
+.wcard__h h3 { font-family: 'Playfair Display', serif; font-weight: 600; font-size: 1.06rem; margin: 0; }
+.wcard__h .muted { font-size: .8rem; }
+.wcard__hint { font-size: .8rem; color: var(--smoke); margin: -4px 0 12px; line-height: 1.5; }
+.wcard + .wcard { margin-top: 0; }
+
+.wfield { margin-bottom: 12px; }
+.wfield:last-child { margin-bottom: 0; }
+.wfield > label { display: block; font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em;
+  font-size: .64rem; color: var(--smoke); margin-bottom: 5px; }
+.wrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.wrow3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.winline { display: flex; gap: 10px; align-items: flex-end; }
+
+/* item list (services / barbers / products / comforts) */
+.witem { border: 1px solid var(--line-on-paper); border-radius: 12px; padding: 13px 14px; margin-bottom: 12px; background: var(--surface, #fbf7ee); }
+.witem:last-of-type { margin-bottom: 12px; }
+.witem__h { display: flex; align-items: center; gap: 11px; margin-bottom: 11px; }
+.witem__h .av { flex: none; }
+.witem__t { font-weight: 600; font-size: .96rem; }
+.witem__t small { display: block; font-weight: 400; font-size: .76rem; color: var(--smoke); }
+.witem__sp { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.witem__grip { color: var(--stone); cursor: grab; display: inline-grid; place-content: center; }
+.witem__del { appearance: none; background: none; border: 0; cursor: pointer; color: #a23b2b; width: 30px; height: 30px;
+  border-radius: 7px; display: grid; place-content: center; }
+.witem__del:hover { background: rgba(162,59,43,.08); }
+.witem.is-off { opacity: .62; }
+.wadd { align-self: flex-start; }
+
+/* photo picker */
+.wphoto { display: flex; align-items: center; gap: 13px; margin-bottom: 12px; }
+.wphoto__img { width: 54px; height: 54px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line-on-paper); background: var(--paper); flex: none; }
+.wphoto__round { border-radius: 50%; }
+.wimg { display: flex; align-items: center; gap: 13px; }
+.wimg__thumb { width: 88px; height: 62px; border-radius: 8px; background: var(--paper) center/cover no-repeat; border: 1px solid var(--line-on-paper); flex: none; display: grid; place-content: center; color: var(--stone); }
+.wimg__thumb.is-empty { border-style: dashed; }
+.wimg__thumb i { width: 18px; height: 18px; }
+.wimg__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---- live preview ---- */
+.wprev { position: sticky; top: 8px; }
+.wprev__bar { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+.wprev__bar .lbl { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .1em; font-size: .66rem; color: var(--smoke); }
+.wprev__live { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; color: var(--smoke); }
+.wprev__live i { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); }
+.wprev__device { background: #16140f; border-radius: 30px; padding: 9px; box-shadow: 0 20px 50px -22px rgba(16,14,11,.55), inset 0 0 0 1px rgba(232,210,159,.08); }
+.wprev__screen { position: relative; border-radius: 22px; overflow: hidden; background: var(--paper); height: 600px; }
+.wprev__screen iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--paper); }
+.wprev__refresh { position: absolute; right: 10px; bottom: 10px; z-index: 3; width: 34px; height: 34px; border-radius: 50%;
+  border: 0; cursor: pointer; background: rgba(22,20,15,.78); color: var(--paper); display: grid; place-content: center; backdrop-filter: blur(4px); }
+.wprev__refresh i { width: 16px; height: 16px; }
+.wprev__foot { display: flex; gap: 8px; margin-top: 11px; }
+
+/* mobile preview toggle (hidden on desktop) */
+.wprev-toggle { display: none; }
+
+@media (max-width: 1080px) {
+  .wsite { grid-template-columns: minmax(0, 1fr); }
+  .wprev { position: fixed; inset: auto 0 0 0; z-index: 40; transform: translateY(102%); transition: transform .32s cubic-bezier(.22,1,.36,1);
+    background: var(--paper); border-top: 1px solid var(--line-on-paper); padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -16px 40px -24px rgba(16,14,11,.5); }
+  .wprev.is-open { transform: none; }
+  .wprev__device { max-width: 320px; margin: 0 auto; }
+  .wprev-toggle { display: inline-flex; position: fixed; right: 16px; bottom: 16px; z-index: 41; }
+}
+
+@media (max-width: 720px) {
+  .wpub { flex-wrap: wrap; }
+  .wpub__sp { flex-basis: 100%; height: 0; margin: 0; }
+  .wpub__actions { width: 100%; }
+  .wpub__actions .b { flex: 1; justify-content: center; }
+  .wrow, .wrow3 { grid-template-columns: 1fr; }
+}
