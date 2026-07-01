@@ -7,8 +7,8 @@
   const $ = (s, r = document) => r.querySelector(s);
   const ic = KA.icons;
 
-  const TITLES = { vandaag: 'Vandaag', agenda: 'Agenda', beschikbaarheid: 'Beschikbaarheid', klanten: 'Klanten', statistieken: 'Statistieken', barbiers: 'Barbiers', diensten: 'Diensten & matrix', instellingen: 'Instellingen', banner: 'Banner', mailing: 'Bulk e-mail', beheerders: 'Beheerders' };
-  const OWNER_ONLY = ['diensten', 'instellingen', 'banner', 'mailing', 'beheerders'];
+  const TITLES = { vandaag: 'Vandaag', agenda: 'Agenda', beschikbaarheid: 'Beschikbaarheid', klanten: 'Klanten', statistieken: 'Statistieken', barbiers: 'Barbiers', diensten: 'Diensten & matrix', instellingen: 'Instellingen', banner: 'Banner', website: 'Website', mailing: 'Bulk e-mail', beheerders: 'Beheerders' };
+  const OWNER_ONLY = ['diensten', 'instellingen', 'banner', 'website', 'mailing', 'beheerders'];
 
   function renderScreen(h) {
     if (h === 'vandaag') KA.renderVandaag();
@@ -19,6 +19,7 @@
     else if (h === 'diensten') { KA.renderDiensten(); if (KA._scrollMatrix) { KA._scrollMatrix = false; setTimeout(() => { const mp = $('#matrixPanel'); if (mp) mp.scrollIntoView({ block: 'center' }); }, 60); } }
     else if (h === 'beschikbaarheid') KA.renderBeschikbaarheid();
     else if (h === 'beheerders') KA.renderBeheerders();
+    else if (h === 'website' && KA.renderWebsite) KA.renderWebsite();
   }
 
   function route() {
