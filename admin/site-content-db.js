@@ -62,7 +62,7 @@
     contact: {
       addr: ['Parijsstraat 29', '3000 Leuven', 'België'], phone: '+32 486 33 67 14', email: 'info@kameraadhaarsnijder.be',
       footerImg: 'assets/footer-adil.jpg',
-      social: { facebook: '', instagram: 'https://www.instagram.com/kameraadhaarsnijder/', tiktok: '', youtube: '' },
+      social: { facebook: 'https://www.facebook.com/kameraadhaarsnijder', instagram: 'https://www.instagram.com/kameraadhaarsnijder/', tiktok: 'https://www.tiktok.com/@kameraadhaarsnijder', youtube: 'https://www.youtube.com/@kameraadhaarsnijder' },
       l: {
         leuvens: { pitch: 'Boek a momentsje. Komt binne in e plek woe de tij vertroogt en de details tellen.' },
         nl: { pitch: 'Boek je moment. Stap binnen in een plek waar de tijd vertraagt en details ertoe doen.' },
