@@ -100,11 +100,36 @@
     }; img.onerror = function () { KA.toast('Kon de afbeelding niet lezen.', { type: 'err' }); }; img.src = r.result; };
     r.readAsDataURL(file);
   }
+  // Upload a downscaled image to Supabase Storage (site-media, public-read) and
+  // return its public URL. done(null) on failure so the caller keeps the old value (P-27).
+  function uploadToStorage(dataUrl, done) {
+    var sb = window.KA && KA.SB;
+    if (!sb || !sb.storage) { done(dataUrl); return; }   // dev fallback: keep the data-url
+    fetch(dataUrl).then(function (r) { return r.blob(); }).then(function (blob) {
+      var ext = blob.type.indexOf('png') > -1 ? 'png' : (blob.type.indexOf('webp') > -1 ? 'webp' : 'jpg');
+      var path = 'cms/' + Math.random().toString(36).slice(2, 10) + '-' + Date.now() + '.' + ext;
+      sb.storage.from('site-media').upload(path, blob, { contentType: blob.type, upsert: false }).then(function (res) {
+        if (res.error) { done(null); return; }
+        done(sb.storage.from('site-media').getPublicUrl(path).data.publicUrl);
+      }, function () { done(null); });
+    }, function () { done(null); });
+  }
+  // downscale → upload → callback(publicUrl); toasts + keeps old on failure.
+  function pickAndUpload(file, maxDim, thumb, onUrl) {
+    if (thumb) thumb.classList.add('is-loading');
+    downscaleImg(file, maxDim, function (durl) {
+      uploadToStorage(durl, function (publicUrl) {
+        if (thumb) thumb.classList.remove('is-loading');
+        if (publicUrl) onUrl(publicUrl);
+        else KA.toast('Upload mislukt — vorige foto behouden.', { type: 'err' });
+      });
+    });
+  }
   function imageField(label, url, onSet, opts) {
     opts = opts || {};
     const thumb = h('div', { class: 'wimg__thumb' + (url ? '' : ' is-empty'), style: url ? ("background-image:url('" + ('' + url).replace(/'/g, '%27') + "')") : '' }, [url ? null : iconEl('image')]);
     const file = h('input', { type: 'file', accept: 'image/*', hidden: 'hidden' });
-    file.addEventListener('change', function (e) { const f = e.target.files[0]; if (!f) return; if (f.size > 8e6) { KA.toast('Foto te groot (max 8MB).', { type: 'err' }); return; } downscaleImg(f, opts.max || 1200, function (durl) { onSet(durl); }); });
+    file.addEventListener('change', function (e) { const f = e.target.files[0]; if (!f) return; if (f.size > 8e6) { KA.toast('Foto te groot (max 8MB).', { type: 'err' }); return; } pickAndUpload(f, opts.max || 1200, thumb, function (url) { onSet(url); }); });
     const btns = [h('label', { class: 'b b--ghost b--sm', style: 'cursor:pointer' }, [iconEl('upload'), ' ' + (opts.btn || 'Foto'), file])];
     if (url) btns.push(h('button', { class: 'b b--ghost b--sm', onclick: function () { onSet(''); } }, [iconEl('x'), ' Verwijder']));
     const kids = [];
@@ -229,7 +254,7 @@
     const items = its.map(function (it, i) {
       const img = h('img', { class: 'wphoto__img', src: it.img || '', alt: '' });
       const file = h('input', { type: 'file', accept: 'image/*', hidden: 'hidden' });
-      file.addEventListener('change', function (e) { const f = e.target.files[0]; if (!f) return; if (f.size > 1.5e6) { KA.toast('Foto te groot (max 1.5MB).', { type: 'err' }); return; } readImg(f, function (url) { img.src = url; setVal(['products', 'items', i, 'img'], url); }); });
+      file.addEventListener('change', function (e) { const f = e.target.files[0]; if (!f) return; if (f.size > 8e6) { KA.toast('Foto te groot (max 8MB).', { type: 'err' }); return; } pickAndUpload(f, 1000, img, function (url) { img.src = url; setVal(['products', 'items', i, 'img'], url); }); });
       return h('div', { class: 'witem' }, [
         h('div', { class: 'witem__h' }, [
           h('div', { class: 'witem__t' }, [esc(S.pick(it.name, lang)) || 'Product']),
