@@ -7,8 +7,8 @@
   const $ = (s, r = document) => r.querySelector(s);
   const ic = KA.icons;
 
-  const TITLES = { vandaag: 'Vandaag', agenda: 'Agenda', beschikbaarheid: 'Beschikbaarheid', klanten: 'Klanten', statistieken: 'Statistieken', barbiers: 'Barbiers', diensten: 'Diensten & matrix', instellingen: 'Instellingen', banner: 'Banner', website: 'Website', mailing: 'Bulk e-mail', beheerders: 'Beheerders' };
-  const OWNER_ONLY = ['diensten', 'instellingen', 'banner', 'website', 'mailing', 'beheerders'];
+  const TITLES = { vandaag: 'Vandaag', agenda: 'Agenda', beschikbaarheid: 'Beschikbaarheid', klanten: 'Klanten', statistieken: 'Statistieken', barbiers: 'Barbiers', diensten: 'Diensten & matrix', instellingen: 'Instellingen', banner: 'Banner', website: 'Website', advertenties: 'Advertenties', mailing: 'Bulk e-mail', beheerders: 'Beheerders' };
+  const OWNER_ONLY = ['diensten', 'instellingen', 'banner', 'website', 'advertenties', 'mailing', 'beheerders'];
 
   function renderScreen(h) {
     if (h === 'vandaag') KA.renderVandaag();
@@ -20,6 +20,7 @@
     else if (h === 'beschikbaarheid') KA.renderBeschikbaarheid();
     else if (h === 'beheerders') KA.renderBeheerders();
     else if (h === 'website' && KA.renderWebsite) KA.renderWebsite();
+    else if (h === 'advertenties' && KA.renderAdvertenties) KA.renderAdvertenties();
   }
 
   function route() {
