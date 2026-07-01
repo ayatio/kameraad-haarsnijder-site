@@ -17,7 +17,7 @@ two FKs from `appointments` to `barbers` (`barber_id` + `resolved_by`), so a bar
 `barbers(name)` embed is ambiguous and fails.
 
 ## Secrets / config
-- `RESEND_API_KEY` — currently inlined (demo). **Rotate** and move to a function secret.
+- `RESEND_API_KEY` — read from a Supabase **Function secret** (Dashboard → Edge Functions → Secrets → `RESEND_API_KEY`). Never hardcoded, never in the repo. All three functions use `Deno.env.get('RESEND_API_KEY')`.
 - `FROM` — `Kameraad Haarsnijder <info@mail.kameraadhaarsnijder.be>` (domain
   `mail.kameraadhaarsnijder.be` verified in Resend 2026-07-01; all three functions
   send from it and reach any recipient). The apex `kameraadhaarsnijder.be` is

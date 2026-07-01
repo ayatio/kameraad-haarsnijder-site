@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const RESEND_API_KEY = 're_9NDD8eX4_Dbb84xKU3YLTAf7gXGPF87v2';
+// Read from a Supabase Function secret — never hardcoded.
+// Set it: Dashboard → Edge Functions → Secrets → RESEND_API_KEY
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? '';
 const FROM = 'Kameraad Haarsnijder <info@mail.kameraadhaarsnijder.be>';
 const TZ = 'Europe/Brussels';
 const PORTAL = 'https://ayatio.github.io/kameraad-haarsnijder-site/afspraak/';
