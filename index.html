@@ -1586,6 +1586,7 @@
       var bkErrEl = null;
       var ERR_MSG = {
         slot_taken: 'Dat moment is net bezet — kies een ander tijdstip.',
+        _unavailable: 'Dat tijdstip is niet meer beschikbaar — kies een ander.',
         in_past: 'Dat tijdstip is al voorbij — kies een ander.',
         email_invalid: 'Controleer je e-mailadres.',
         name_required: 'Vul je voor- en achternaam in.',
@@ -1635,8 +1636,15 @@
           confirmBtn.textContent = lbl;
           if (res && res.error) {
             confirmBtn.disabled = false;
-            showBookError(res.error.message || res.error.code || '');
-            if (/slot_taken/.test(res.error.message || '')) buildTimes();
+            var em = res.error.message || res.error.code || '';
+            // Server-authority rejections (hardened book_appointment, 23514) → the slot is
+            // no longer bookable; show "niet beschikbaar" and refresh the times.
+            if (/slot_taken|outside availability|inside lead|slot blocked|does not offer/.test(em)) {
+              showBookError(/slot_taken/.test(em) ? 'slot_taken' : '_unavailable');
+              buildTimes();
+            } else {
+              showBookError(em);
+            }
             return;
           }
           finishOk();
