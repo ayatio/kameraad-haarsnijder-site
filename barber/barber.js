@@ -205,8 +205,8 @@
   function cancelAppt(id) {
     var m = modal(
       '<h2 class="serif">Afspraak annuleren</h2>' +
-      '<p style="font-size:.95rem;line-height:1.5;color:var(--fg2)">Dit telt als een laattijdige annulering. De klant wordt een <b>vergoeding</b> aangerekend en ontvangt een e-mail.</p>' +
-      '<div class="sheet__foot"><button class="btn btn--ghost" data-close>Terug</button><button class="btn btn--danger" id="cxOk">Annuleren & aanrekenen</button></div>'
+      '<p style="font-size:.95rem;line-height:1.5;color:var(--fg2)">Dit telt als een laattijdige annulering. De klant wordt gemarkeerd als <b>te betalen</b> (zichtbaar op het klantprofiel). Er wordt <b>geen</b> automatische e-mail verstuurd.</p>' +
+      '<div class="sheet__foot"><button class="btn btn--ghost" data-close>Terug</button><button class="btn btn--danger" id="cxOk">Annuleren</button></div>'
     );
     $('cxOk').onclick = function () {
       var btn = $('cxOk'); btn.disabled = true; btn.textContent = '…';
@@ -214,9 +214,9 @@
         status: 'cancelled', payment_due: true, cancelled_at: new Date().toISOString(),
         resolved_at: new Date().toISOString(), resolved_by: B.me.barberId
       }).eq('id', id).then(function (r) {
-        if (r.error) { btn.disabled = false; btn.textContent = 'Annuleren & aanrekenen'; toast('Mislukt.'); return; }
-        callFn('send-payment-due', { appointment_id: id, reason: 'barber_cancel' });
-        m.close(); toast('Geannuleerd — klant aangerekend.'); loadDay();
+        if (r.error) { btn.disabled = false; btn.textContent = 'Annuleren'; toast('Mislukt.'); return; }
+        // Chair-side cancel = flag only (payment_due), no automatic email (owner decision).
+        m.close(); toast('Geannuleerd — als te betalen gemarkeerd.'); loadDay();
       });
     };
   }
