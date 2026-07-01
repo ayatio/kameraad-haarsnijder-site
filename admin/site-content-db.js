@@ -140,29 +140,43 @@
       this._persistTimers[sec] = setTimeout(function () {
         if (!sb) return;
         sb.from('site_content').update({ draft: _draft[sec] || {} }).eq('key', sec).then(function (r) {
-          if (r.error && window.KA && KA.toast) KA.toast('Opslaan mislukt — probeer opnieuw.', { type: 'err' });
+          if (r.error) { if (window.KA && KA.toast) KA.toast('Opslaan mislukt — probeer opnieuw.', { type: 'err' }); return; }
+          try { window.dispatchEvent(new Event('khsite:saved')); } catch (e) {}   // draft persisted → refresh preview
         });
       }, 260);
     },
 
+    // Force any pending debounced draft-writes to the DB now, and resolve when done.
+    _flush: function () {
+      var self = this, pending = [];
+      Object.keys(this._persistTimers).forEach(function (sec) {
+        clearTimeout(self._persistTimers[sec]); delete self._persistTimers[sec];
+        if (sb) pending.push(sb.from('site_content').update({ draft: _draft[sec] || {} }).eq('key', sec));
+      });
+      return Promise.all(pending);
+    },
+    // Returns {warnings} on success or {error}. Flushes drafts FIRST so the RPC
+    // promotes the latest edit, not a debounced-but-unsaved one. No optimistic
+    // promote — _pub is only updated after the RPC actually succeeds.
     publish: function () {
       var self = this;
-      // optimistic: published := draft locally so the bar resets immediately
-      SECTIONS.forEach(function (k) { _pub[k] = clone(_draft[k]) || {}; });
-      this.refresh();
-      if (!sb) return Promise.resolve();
-      return sb.rpc('publish_site_content').then(function (r) {
-        if (r.error) { if (window.KA && KA.toast) KA.toast(r.error.message || 'Publiceren mislukt.', { type: 'err' }); self.load(); return; }
-        var warns = (r.data || []).reduce(function (a, x) { return a.concat(x.warnings || []); }, []);
-        if (warns.length && window.KA && KA.toast) KA.toast('Gepubliceerd — ' + warns.length + ' taal-terugval (NL).', { duration: 3000 });
+      if (!sb) { SECTIONS.forEach(function (k) { _pub[k] = clone(_draft[k]) || {}; }); self.refresh(); return Promise.resolve({}); }
+      return this._flush().then(function () {
+        return sb.rpc('publish_site_content').then(function (r) {
+          if (r.error) { self.load(); return { error: r.error }; }
+          SECTIONS.forEach(function (k) { _pub[k] = clone(_draft[k]) || {}; });
+          self.refresh();
+          var warns = (r.data || []).reduce(function (a, x) { return a.concat(x.warnings || []); }, []);
+          return { warnings: warns };
+        }, function (e) { self.load(); return { error: e }; });
       });
     },
     discard: function () {
       var self = this;
-      SECTIONS.forEach(function (k) { _draft[k] = clone(_pub[k]) || {}; });
-      this.refresh();
-      if (!sb) return Promise.resolve();
-      return sb.rpc('discard_site_content').then(function () { self.load(); });
+      // drop pending draft-writes so they can't re-dirty after the reset
+      Object.keys(this._persistTimers).forEach(function (s) { clearTimeout(self._persistTimers[s]); delete self._persistTimers[s]; });
+      if (!sb) { SECTIONS.forEach(function (k) { _draft[k] = clone(_pub[k]) || {}; }); self.refresh(); return Promise.resolve(); }
+      return sb.rpc('discard_site_content').then(function () { return self.load(); });
     },
 
     pick: function (map, lang) {

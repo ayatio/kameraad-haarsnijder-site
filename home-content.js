@@ -139,7 +139,7 @@
       var d = h.days[i] || {};
       var closed = !!d.closed;
       var cls = (i === todayIdx ? ' is-today' : '') + (closed ? ' is-closed' : '');
-      var val = closed ? closedTxt : ((d.open || '10:00') + '–' + (d.close || '20:00'));
+      var val = closed ? closedTxt : esc((d.open || '10:00') + '–' + (d.close || '20:00'));
       html += '<li class="' + cls.trim() + '"><span class="d">' + DAYS_NL[i] + '</span><span class="h">' + val + '</span></li>';
     }
     var hk = pickL(h.l, 'holidays_k'), hv = pickL(h.l, 'holidays_v');
@@ -157,6 +157,8 @@
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', load); else load();
+  // the admin preview iframe asks us to re-fetch after each draft save (P-24 live preview)
+  window.addEventListener('message', function (e) { if (e.data && e.data.type === 'khsite:refresh') load(); });
   // re-apply CMS after every language switch (i18n runs applyStatic first, then subscribers)
   function hookLang() { if (window.KH && KH.onChange) KH.onChange(function () { apply(); }); else setTimeout(hookLang, 200); }
   hookLang();
