@@ -1010,7 +1010,7 @@
   <script src="i18n.js?v=2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="booking.js?v=4"></script>
-  <script src="home-content.js?v=2"></script>
+  <script src="home-content.js?v=3"></script>
   <script>
     // Entrance motion via IntersectionObserver, with guaranteed reveal.
     (function () {
@@ -1189,6 +1189,8 @@
       function hashStr(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
       function resolveBarberFor(d) {
         if (state.barber !== 'any') return state.barber;
+        // prefer a barber who actually has the chosen time free (from the union in buildTimes)
+        if (state.time && state.slotBarbers && state.slotBarbers[state.time] && state.slotBarbers[state.time].length) return state.slotBarbers[state.time][0];
         var b = eligibleBarbersForSvc().filter(function (x) { return worksOn(x, d); })[0];
         return b ? b.id : 'any';
       }
@@ -1468,7 +1470,7 @@
         timesWrap.innerHTML = '';
         var groups = [['morning', []], ['afternoon', []], ['evening', []]];
         slots.forEach(function (m) { groups[m < 780 ? 0 : (m < 1020 ? 1 : 2)][1].push(m); });
-        var any = false;
+        var any = false, selStillAvailable = false;
         groups.forEach(function (g) {
           if (!g[1].length) return;
           var sec = document.createElement('div'); sec.className = 'bk-tgroup';
@@ -1478,12 +1480,15 @@
           g[1].forEach(function (m) {
             var t = pad(Math.floor(m / 60)) + ':' + pad(m % 60);
             var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'bk-time'; btn.textContent = t; btn.dataset.time = t;
-            if (takenSet[t]) { btn.disabled = true; btn.title = KH.t('book.taken'); if (state.time === t) state.time = null; } else any = true;
+            if (takenSet[t]) { btn.disabled = true; btn.title = KH.t('book.taken'); if (state.time === t) state.time = null; } else { any = true; if (state.time === t) selStillAvailable = true; }
             if (state.time === t) btn.classList.add('is-sel');
             gr.appendChild(btn);
           });
           sec.appendChild(gr); timesWrap.appendChild(sec);
         });
+        // A previously-picked time that has since vanished from the list (taken by
+        // someone else, or the day changed) must be cleared — else Confirm loops on reject.
+        if (state.time && !selStillAvailable) state.time = null;
         if (!any) { var p = document.createElement('div'); p.className = 'bk-noslots'; p.textContent = KH.t('book.no_slots'); timesWrap.appendChild(p); }
       }
       // Slots are seeded open, then the real booked times come back from
@@ -1491,21 +1496,33 @@
       // overlap guard in book_appointment() is the source of truth either way.
       function buildTimes() {
         if (!state.dateObj) { timesWrap.innerHTML = ''; return; }
-        var rb = resolveBarberFor(state.dateObj);
+        var reqDate = state.dateObj;
         // Real engine: the server returns true free start-times (the barber's
         // actual hours − existing appointments − blocks − lead/buffer).
         if (window.KB && KB.availableSlots) {
-          var reqDate = state.dateObj;
+          // "Geen voorkeur" → union the free slots of EVERY eligible working barber
+          // (not just the first), and remember which barbers offer each slot so the
+          // booking picks one who's actually free at the chosen time.
+          var barberIds = state.barber === 'any'
+            ? eligibleBarbersForSvc().filter(function (b) { return worksOn(b, reqDate); }).map(function (b) { return b.id; })
+            : [resolveBarberFor(reqDate)];
+          barberIds = barberIds.filter(Boolean);
+          if (!barberIds.length) { renderTimes([], {}); update(); return; }
           timesWrap.innerHTML = '<div class="bk-noslots" style="opacity:.5">…</div>';
-          KB.availableSlots(rb, state.svc, reqDate).then(function (arr) {
+          Promise.all(barberIds.map(function (bid) {
+            return KB.availableSlots(bid, state.svc, reqDate).then(function (arr) { return { bid: bid, arr: arr }; });
+          })).then(function (results) {
             if (state.dateObj !== reqDate) return; // user navigated away
-            if (arr === null) { buildTimesFallback(rb); return; } // RPC failed → built-in engine
-            var mins = arr.map(function (t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3), 10); });
+            if (results.length === 1 && results[0].arr === null) { buildTimesFallback(barberIds[0]); return; } // RPC failed → built-in engine
+            var slotBarbers = {};
+            results.forEach(function (res) { (res.arr || []).forEach(function (t) { (slotBarbers[t] = slotBarbers[t] || []).push(res.bid); }); });
+            state.slotBarbers = slotBarbers;
+            var mins = Object.keys(slotBarbers).map(function (t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3), 10); }).sort(function (a, b) { return a - b; });
             renderTimes(mins, {});
             update();
           });
         } else {
-          buildTimesFallback(rb);
+          buildTimesFallback(resolveBarberFor(reqDate));
         }
       }
       // Built-in fallback engine (15-min grid + taken_slots) for when the RPC is unavailable.
@@ -1609,6 +1626,17 @@
       }
       function clearBookError() { if (bkErrEl) bkErrEl.style.display = 'none'; }
 
+      // The Europe/Brussels UTC offset ('+01:00'/'+02:00') for a given calendar date,
+      // so a chosen wall-clock slot maps to the right instant on any device timezone.
+      function brusselsOffsetStr(dateStr) {
+        var probe = new Date(dateStr + 'T12:00:00Z');
+        var utc = new Date(probe.toLocaleString('en-US', { timeZone: 'UTC' }));
+        var bru = new Date(probe.toLocaleString('en-US', { timeZone: 'Europe/Brussels' }));
+        var mins = Math.round((bru - utc) / 60000);
+        var sign = mins >= 0 ? '+' : '-'; mins = Math.abs(mins);
+        return sign + pad(Math.floor(mins / 60)) + ':' + pad(mins % 60);
+      }
+
       confirmBtn.addEventListener('click', function () {
         if (confirmBtn.disabled) return;
         clearBookError();
@@ -1621,8 +1649,8 @@
         if (!window.KB) { finishOk(); return; }
 
         var dd = state.dateObj;
-        var start = new Date(dd.getFullYear(), dd.getMonth(), dd.getDate(),
-          parseInt(state.time.slice(0, 2), 10), parseInt(state.time.slice(3), 10), 0, 0);
+        var ds2 = dd.getFullYear() + '-' + pad(dd.getMonth() + 1) + '-' + pad(dd.getDate());
+        var start = new Date(ds2 + 'T' + state.time + ':00' + brusselsOffsetStr(ds2));
         var lbl = confirmBtn.textContent;
         confirmBtn.disabled = true; confirmBtn.textContent = '…';
 

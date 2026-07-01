@@ -43,6 +43,7 @@
   // ---- modal ----
   function modal(html) {
     var mount = $('modalMount');
+    mount.innerHTML = '';   // one modal at a time — avoids stacked sheets with duplicate element ids
     var scrim = document.createElement('div'); scrim.className = 'scrim';
     scrim.innerHTML = '<div class="sheet">' + html + '</div>';
     mount.appendChild(scrim);
@@ -73,6 +74,7 @@
   function enter(session) {
     var email = session.user.email;
     sb.from('admin_users').select('barber_id,role,email').eq('email', email).maybeSingle().then(function (r) {
+      if (r.error) { showLogin('Verbindingsprobleem — probeer opnieuw.'); return; }   // network error: keep the session, don't sign out
       var au = r.data;
       if (!au || !au.barber_id) { showLogin('Dit account is niet aan een barbier gekoppeld.'); sb.auth.signOut(); return; }
       sb.from('barbers').select('id,name').eq('id', au.barber_id).single().then(function (br) {
@@ -96,8 +98,14 @@
   }
 
   // ---- day load ----
+  function renderLoadError() {
+    var list = $('dayList'); if (!list) return;
+    list.innerHTML = '<div class="empty"><span class="serif">Kon de agenda niet laden</span><p class="muted">Controleer je verbinding.</p><button class="btn btn--gold" id="retryDay" style="margin-top:14px">Opnieuw proberen</button></div>';
+    var b = $('retryDay'); if (b) b.onclick = loadDay;
+  }
   function loadDay() {
     $('dLabel').textContent = dayLabel(B.date);
+    var list0 = $('dayList'); if (list0) list0.innerHTML = '<div class="empty"><span class="serif">Laden…</span></div>';
     var ds = ymd(B.date);
     var lo = new Date(ds + 'T00:00:00Z'); lo.setUTCDate(lo.getUTCDate() - 1);
     var hi = new Date(ds + 'T00:00:00Z'); hi.setUTCDate(hi.getUTCDate() + 2);
@@ -107,6 +115,7 @@
       .gte('start_at', lo.toISOString()).lt('start_at', hi.toISOString())
       .order('start_at')
       .then(function (r) {
+        if (r.error) { renderLoadError(); return; }   // don't render a failed fetch as an empty day
         B.appts = (r.data || []).filter(function (a) { return brusselsDate(a.start_at) === ds; });
         render();
       });
@@ -232,7 +241,7 @@
       '<label style="display:flex;align-items:center;gap:8px;font-size:.9rem;margin:2px 0 12px;cursor:pointer"><input type="checkbox" id="naWalkin"> Walk-in (onbekende klant)</label>' +
       '<div class="field"><label>Dienst</label><select class="in" id="naSvc">' + svcOpts + '</select></div>' +
       '<div class="row2"><div class="field"><label>Tijd</label><input class="in" id="naTime" type="time" step="1800" value="10:00"></div>' +
-        '<div class="field"><label>Datum</label><input class="in" id="naDate" type="date" value="' + ymd(B.date) + '"></div></div>' +
+        '<div class="field"><label>Datum</label><input class="in" id="naDate" type="date" min="' + ymd(new Date()) + '" max="' + ymd(maxDate()) + '" value="' + ymd(B.date) + '"></div></div>' +
       '<div class="err" id="naErr" hidden></div>' +
       '<div class="sheet__foot"><button class="btn btn--ghost" data-close>Annuleren</button><button class="btn btn--gold" id="naSave">Boeken</button></div>'
     );
@@ -243,15 +252,21 @@
       if (!svc || !time || !dateStr) { showErr('naErr', 'Vul dienst, tijd en datum in.'); return; }
       var start = new Date(dateStr + 'T' + time + ':00'); // tablet tz = Brussels
       var end = new Date(start.getTime() + (svc.duration_min || 30) * 60000);
+      if (start.getTime() < Date.now() - 5 * 60000) { showErr('naErr', 'Dat tijdstip is al voorbij.'); return; }
+      if (dateStr > ymd(maxDate())) { showErr('naErr', 'Buiten de boekingshorizon.'); return; }
       var btn = $('naSave'); btn.disabled = true; btn.textContent = '…';
 
-      resolveCustomer(walkin, typed).then(function (custId) {
-        if (!custId) { btn.disabled = false; btn.textContent = 'Boeken'; showErr('naErr', 'Kon klant niet bepalen.'); return; }
+      resolveCustomer(walkin, typed).then(function (cust) {
+        if (!cust || !cust.id) { btn.disabled = false; btn.textContent = 'Boeken'; showErr('naErr', 'Kon klant niet bepalen.'); return; }
         sb.from('appointments').insert({
-          barber_id: B.me.barberId, service_id: svcId, customer_id: custId,
+          barber_id: B.me.barberId, service_id: svcId, customer_id: cust.id,
           start_at: start.toISOString(), end_at: end.toISOString(), status: 'confirmed'
         }).select('id').single().then(function (r) {
-          if (r.error) { btn.disabled = false; btn.textContent = 'Boeken'; showErr('naErr', r.error.message.indexOf('slot') > -1 ? 'Tijd niet beschikbaar.' : 'Boeken mislukt.'); return; }
+          if (r.error) {
+            if (cust.created) sb.from('customers').delete().eq('id', cust.id);   // no orphan customer on a failed booking
+            btn.disabled = false; btn.textContent = 'Boeken';
+            showErr('naErr', r.error.message.indexOf('slot') > -1 ? 'Tijd niet beschikbaar.' : 'Boeken mislukt.'); return;
+          }
           m.close(); toast('Afspraak geboekt.');
           if (ymd(B.date) !== dateStr) { B.date = new Date(dateStr + 'T12:00:00'); }
           bootData();
@@ -261,14 +276,16 @@
   };
 
   // walkin=true -> generic; typed matches existing -> that customer; else create minimal new customer
+  // → { id, created }. created=true means we just inserted a customer (so the
+  // caller can delete it if the appointment insert then fails — no orphan).
   function resolveCustomer(walkin, typed) {
-    if (walkin || !typed) return Promise.resolve(GENERIC_CUST);
+    if (walkin || !typed) return Promise.resolve({ id: GENERIC_CUST, created: false });
     var existing = B.customers.find(function (c) { return c.name.toLowerCase() === typed.toLowerCase(); });
-    if (existing) return Promise.resolve(existing.id);
+    if (existing) return Promise.resolve({ id: existing.id, created: false });
     var parts = typed.split(/\s+/); var first = parts[0] || 'Walk-in'; var last = parts.slice(1).join(' ') || '';
     var synthetic = 'walkin+' + Math.random().toString(36).slice(2, 8) + '@kameraadhaarsnijder.be';
     return sb.from('customers').insert({ first_name: first, last_name: last, email: synthetic, preferred_language: 'nl', email_missing: true }).select('id').single()
-      .then(function (r) { return r.error ? null : r.data.id; });
+      .then(function (r) { return r.error ? { id: null } : { id: r.data.id, created: true }; });
   }
 
   // ---- customer fiche ----

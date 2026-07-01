@@ -97,7 +97,7 @@
       cv.getContext('2d').drawImage(img, 0, 0, w, hh);
       var out; try { out = cv.toDataURL('image/webp', 0.82); } catch (e) { out = cv.toDataURL('image/jpeg', 0.85); }
       cb(out);
-    }; img.onerror = function () { KA.toast('Kon de afbeelding niet lezen.', { type: 'err' }); }; img.src = r.result; };
+    }; img.onerror = function () { KA.toast('Kon de afbeelding niet lezen.', { type: 'err' }); cb(null); }; img.src = r.result; };
     r.readAsDataURL(file);
   }
   // Upload a downscaled image to Supabase Storage (site-media, public-read) and
@@ -118,6 +118,7 @@
   function pickAndUpload(file, maxDim, thumb, onUrl) {
     if (thumb) thumb.classList.add('is-loading');
     downscaleImg(file, maxDim, function (durl) {
+      if (!durl) { if (thumb) thumb.classList.remove('is-loading'); return; }   // unreadable image → release the slot
       uploadToStorage(durl, function (publicUrl) {
         if (thumb) thumb.classList.remove('is-loading');
         if (publicUrl) onUrl(publicUrl);
@@ -429,7 +430,9 @@
   function currentSection() { for (let i = 0; i < TABS.length; i++) if (TABS[i][0] === activeTab) return TABS[i][3]; return 'top'; }
 
   /* ---------- preview control ---------- */
-  function refreshPreview() { try { frame.contentWindow.KHSite.refresh(); } catch (e) {} }
+  function refreshPreview() { try { if (frame && frame.contentWindow) frame.contentWindow.postMessage({ type: 'khsite:refresh' }, '*'); } catch (e) {} }
+  // when a draft edit finishes persisting to the DB, re-fetch the preview iframe
+  window.addEventListener('khsite:saved', function () { refreshPreview(); });
   function setPreviewLang(l) { try { frame.contentWindow.KH.setLang(l); } catch (e) {} }
   function scrollPreviewTo(id) {
     try {
@@ -458,14 +461,22 @@
   }
   function publish() {
     if (!S.dirty()) return;
-    S.publish();
-    KA.toast('Gepubliceerd — nu live op de site.');
-    updatePubbar(); refreshPreview();
+    var b = pubbarEl && pubbarEl.querySelector('.js-publish'); if (b) { b.disabled = true; b.textContent = '…'; }
+    S.publish().then(function (res) {
+      if (b) b.textContent = 'Publiceer';
+      if (res && res.error) {
+        KA.toast('Publiceren mislukt' + (res.error.message ? ' — ' + res.error.message : '') + '.', { type: 'err' });
+      } else {
+        var w = (res && res.warnings) || [];
+        KA.toast('Gepubliceerd — nu live.' + (w.length ? ' (' + w.length + ' taal valt terug op NL)' : ''));
+      }
+      updatePubbar(); refreshPreview();
+    });
   }
   function discard() {
     if (!S.dirty()) return;
     KA.confirm({ title: 'Wijzigingen verwerpen?', body: 'Alle niet-gepubliceerde aanpassingen gaan verloren. De site blijft zoals nu gepubliceerd.', confirmText: 'Verwerp', danger: true, onConfirm: function () {
-      S.discard(); KA.toast('Concept verworpen.'); renderPanel(); updatePubbar(); refreshPreview();
+      S.discard().then(function () { KA.toast('Concept verworpen.'); renderPanel(); updatePubbar(); refreshPreview(); });
     } });
   }
 
