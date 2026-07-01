@@ -306,9 +306,12 @@
   }
   function statusNl(s) { return ({ completed: 'Geknipt', cancelled: 'Geannuleerd', no_show: 'No-show', confirmed: 'Bevestigd', pending: 'In afwachting' })[s] || s; }
 
-  // ---- date nav ----
-  $('dPrev').onclick = function () { B.date.setDate(B.date.getDate() - 1); loadDay(); };
-  $('dNext').onclick = function () { B.date.setDate(B.date.getDate() + 1); loadDay(); };
+  // ---- date nav (forward capped at the booking horizon; back capped at ~1yr) ----
+  var HORIZON_DAYS = 56;   // booking_horizon_days
+  function maxDate() { var d = new Date(); d.setDate(d.getDate() + HORIZON_DAYS); return d; }
+  function minDate() { var d = new Date(); d.setDate(d.getDate() - 365); return d; }
+  $('dPrev').onclick = function () { var d = new Date(B.date); d.setDate(d.getDate() - 1); if (ymd(d) >= ymd(minDate())) { B.date = d; loadDay(); } };
+  $('dNext').onclick = function () { var d = new Date(B.date); d.setDate(d.getDate() + 1); if (ymd(d) <= ymd(maxDate())) { B.date = d; loadDay(); } else { toast('Verder dan de boekingshorizon kan niet.'); } };
   $('dToday').onclick = function () { B.date = new Date(); loadDay(); };
 
   // ---- boot ----
