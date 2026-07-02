@@ -45,6 +45,15 @@
     MATRIX: {},            // { barberSlug: [serviceSlug, ...] }  (which barber offers what)
     bySlug: {},
 
+    // Multi-tenant (PR-K, D-a30): resolved from hostname via resolve_tenant(host). Defaults to
+    // Kameraad (tenant 1) so the live single-tenant site is unchanged; overwritten once resolved.
+    TENANT_ID: 1,
+    resolveTenant: function () {
+      return sb.rpc('resolve_tenant', { p_host: window.location.hostname })
+        .then(function (r) { if (!r.error && r.data != null) KB.TENANT_ID = r.data; return KB.TENANT_ID; })
+        .catch(function () { return KB.TENANT_ID; });
+    },
+
     langKey: langKey,
     svc: function (slug) { return KB.bySlug[slug] || null; },
     svcDur: function (slug) { var s = KB.svc(slug); return s ? s.dur : 30; },
@@ -60,6 +69,7 @@
 
     // Load catalogue + matrix + roster + closures from the DB.
     loadCatalogue: function () {
+      var pTenant = KB.resolveTenant();   // side-effect: sets KB.TENANT_ID before any booking RPC
       var pServices = sb.from('services')
         .select('slug,sort_order,price_cents,duration_min,name_nl,name_en,name_fr,name_le')
         .eq('is_active', true).eq('is_walk_in', false).order('sort_order');
@@ -67,7 +77,7 @@
       var pAvail = sb.from('availability').select('day_of_week,barbers(slug)').eq('is_active', true);
       var pBlocks = sb.from('blocked_slots').select('start_at,end_at,barbers(slug)');
 
-      return Promise.all([pServices, pMatrix, pAvail, pBlocks]).then(function (res) {
+      return Promise.all([pServices, pMatrix, pAvail, pBlocks, pTenant]).then(function (res) {
         var sRes = res[0], mRes = res[1], avRes = res[2], blRes = res[3];
         if (sRes.error || !sRes.data || !sRes.data.length) throw (sRes.error || new Error('no services'));
         KB.SERVICES = sRes.data.map(function (r) {
@@ -116,7 +126,7 @@
     // Returns null on error so the caller can fall back to its built-in engine.
     availableSlots: function (barberSlug, serviceSlug, d) {
       var ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      return sb.rpc('available_slots', { p_barber_slug: (barberSlug || '').toLowerCase(), p_service_slug: serviceSlug, p_date: ds })
+      return sb.rpc('available_slots', { p_barber_slug: (barberSlug || '').toLowerCase(), p_service_slug: serviceSlug, p_date: ds, p_tenant_id: KB.TENANT_ID })
         .then(function (r) { if (r.error) { console.warn('[KB] available_slots', r.error); return null; } return r.data || []; })
         .catch(function (e) { console.warn('[KB] available_slots ex', e); return null; });
     },
@@ -124,7 +134,7 @@
     // Booked HH:MM start-times for a barber on a given day.
     takenSlots: function (barberSlug, d) {
       var ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-      return sb.rpc('taken_slots', { p_barber_slug: (barberSlug || '').toLowerCase(), p_date: ds })
+      return sb.rpc('taken_slots', { p_barber_slug: (barberSlug || '').toLowerCase(), p_date: ds, p_tenant_id: KB.TENANT_ID })
         .then(function (r) { if (r.error) { console.warn('[KB] taken_slots', r.error); return []; } return r.data || []; })
         .catch(function (e) { console.warn('[KB] taken_slots ex', e); return []; });
     },
@@ -136,7 +146,8 @@
         p_barber_slug: (p.barber || '').toLowerCase(),
         p_start: p.start,            // ISO 8601 string (UTC)
         p_first: p.first, p_last: p.last, p_email: p.email,
-        p_phone: p.phone, p_note: p.note || null, p_lang: p.lang || 'nl'
+        p_phone: p.phone, p_note: p.note || null, p_lang: p.lang || 'nl',
+        p_tenant_id: KB.TENANT_ID
       }).then(function (res) {
         // Fire-and-forget the confirmation email; never block/break the booking.
         if (res && !res.error && res.data) {
